@@ -11,8 +11,9 @@ public static class PostgresConnectionString
 {
     public static string Normalize(string value)
     {
-        // Al copiar el valor a la consola de Render es fácil arrastrar espacios o un salto de línea.
-        var raw = value.Trim();
+        // Al copiar el valor a la consola de Render es fácil arrastrar espacios, un salto de
+        // línea o las comillas con las que venía envuelto en un fichero de ejemplo.
+        var raw = value.Trim().Trim('"', '\'').Trim();
 
         if (raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
             || raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
@@ -28,14 +29,40 @@ public static class PostgresConnectionString
         }
         catch (ArgumentException ex)
         {
+            // Incluimos longitud y las claves que sí se reconocieron: sitúan el fallo sin
+            // volcar la contraseña en los logs de Render.
             throw new InvalidOperationException(
                 "La cadena de conexión 'Supabase' no tiene un formato válido. Usa clave=valor "
                 + "(Host=...;Port=5432;Database=postgres;Username=...;Password=...;SSL Mode=Require) "
                 + "o la URI postgresql://usuario:clave@host:puerto/base. Si la contraseña contiene "
-                + "';' o '=', entrecomíllala con \" o usa la URI con la clave URL-encoded.", ex);
+                + "';' o '=', entrecomíllala con \" o usa la URI con la clave URL-encoded. "
+                + $"Detalle: {ex.Message} (longitud del valor: {raw.Length}; "
+                + $"claves antes del fallo: {DescribeKeys(raw)}).", ex);
         }
 
         return raw;
+    }
+
+    /// <summary>
+    /// Lista los nombres de clave (nunca los valores) de los segmentos separados por ';'.
+    /// </summary>
+    private static string DescribeKeys(string raw)
+    {
+        var keys = raw.Split(';')
+            .Where(segment => segment.Trim().Length > 0)
+            .Select(segment =>
+            {
+                var parts = segment.Split('=', 2);
+                var key = parts[0].Trim();
+
+                // Un segmento sin '=' (o con un nombre que no parece una clave) suele ser un
+                // trozo de la contraseña partido por un ';'. No lo reproducimos.
+                return parts.Length == 2 && key.Length <= 30 && key.All(c => char.IsLetter(c) || c is ' ' or '_')
+                    ? key
+                    : "<segmento inválido>";
+            });
+
+        return string.Join(", ", keys);
     }
 
     private static string FromUri(string raw)
