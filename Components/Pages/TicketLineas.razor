@@ -1,0 +1,292 @@
+@page "/ticket-lineas"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Líneas de ticket</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Líneas de ticket</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nueva línea</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <DataAnnotationsValidator />
+        <div class="card-header fw-semibold">@(esNuevo ? "Nueva línea" : $"Editar línea #{edicion.Id}")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Ticket</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.TicketId">
+                        <option value="">(elige un ticket)</option>
+                        @foreach (var ticket in tickets)
+                        {
+                            <option value="@ticket.Id">@ticket.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Artículo</label>
+                    <InputSelect class="form-select" Value="edicion.ArticuloId"
+                                 ValueChanged="(long? id) => ArticuloElegido(id)"
+                                 ValueExpression="() => edicion!.ArticuloId">
+                        <option value="">(elige un artículo)</option>
+                        @foreach (var articulo in articulos)
+                        {
+                            <option value="@articulo.Id">@articulo.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Precio unidad (€)</label>
+                    <InputNumber class="form-control" step="0.01" @bind-Value="edicion.PrecioUnidad" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unidades</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.Unidades" />
+                </div>
+            </div>
+            <p class="mt-3 mb-0">Subtotal calculado: <strong>@Subtotal.ToString("N2") €</strong></p>
+            <ValidationSummary class="mt-3 small" />
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@if (lineas is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (lineas.Count == 0)
+{
+    <p><em>No hay líneas registradas.</em></p>
+}
+else
+{
+    <p class="text-muted">@lineas.Count línea(s), @(lineas.Sum(l => l.Subtotal ?? 0).ToString("N2")) € en total.</p>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Ticket</th>
+                    <th>Artículo</th>
+                    <th class="text-end">Precio</th>
+                    <th class="text-end">Unidades</th>
+                    <th class="text-end">Subtotal</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var linea in lineas)
+                {
+                    <tr>
+                        <td>@linea.Id</td>
+                        <td>@Texto(ticketsPorId, linea.TicketId)</td>
+                        <td>@Texto(articulosPorId, linea.ArticuloId)</td>
+                        <td class="text-end">@((linea.PrecioUnidad ?? 0).ToString("N2")) €</td>
+                        <td class="text-end">@linea.Unidades</td>
+                        <td class="text-end">@((linea.Subtotal ?? 0).ToString("N2")) €</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(linea.Id)">Editar</button>
+                            @if (idBorrando == linea.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(linea.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = linea.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? lineas;
+    private List<Opcion> tickets = new();
+    private List<Opcion> articulos = new();
+    private Dictionary<long, string> ticketsPorId = new();
+    private Dictionary<long, string> articulosPorId = new();
+    private Dictionary<long, decimal> preciosPorArticulo = new();
+    private TicketLinea? edicion;
+    private bool esNuevo;
+    private long? idBorrando;
+    private string? error;
+
+    private decimal Subtotal => (edicion?.PrecioUnidad ?? 0) * (edicion?.Unidades ?? 0);
+
+    private static string Texto(Dictionary<long, string> indice, long? id) =>
+        id is not null && indice.TryGetValue(id.Value, out var texto) ? texto : "—";
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            tickets = (await db.Tickets
+                    .AsNoTracking()
+                    .OrderByDescending(t => t.Fecha)
+                    .Select(t => new { t.Id, t.Fecha, t.ImporteTotal })
+                    .ToListAsync())
+                .Select(t => new Opcion(
+                    t.Id,
+                    $"#{t.Id} · {t.Fecha?.ToString("dd/MM/yyyy HH:mm")} · {(t.ImporteTotal ?? 0):N2} €"))
+                .ToList();
+
+            var listaArticulos = await db.Articulos
+                .AsNoTracking()
+                .OrderBy(a => a.Descripcion)
+                .Select(a => new { a.Id, a.Descripcion, a.PrecioUnidad })
+                .ToListAsync();
+
+            articulos = listaArticulos
+                .Select(a => new Opcion(a.Id, $"{a.Descripcion} ({a.PrecioUnidad:N2} €)"))
+                .ToList();
+
+            preciosPorArticulo = listaArticulos.ToDictionary(a => a.Id, a => a.PrecioUnidad);
+
+            ticketsPorId = tickets.ToDictionary(t => t.Id, t => t.Texto);
+            articulosPorId = articulos.ToDictionary(a => a.Id, a => a.Texto);
+
+            lineas = await db.TicketLineas
+                .AsNoTracking()
+                .OrderByDescending(l => l.TicketId)
+                .ThenBy(l => l.Id)
+                .Select(l => new Fila(l.Id, l.TicketId, l.ArticuloId, l.PrecioUnidad, l.Unidades, l.Subtotal))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            lineas ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    // Elegir artículo trae su precio de tarifa, que es lo que se cobra el 99 % de las veces.
+    private void ArticuloElegido(long? id)
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        edicion.ArticuloId = id;
+
+        if (id is not null && preciosPorArticulo.TryGetValue(id.Value, out var precio))
+        {
+            edicion.PrecioUnidad = precio;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new TicketLinea();
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private async Task Editar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            edicion = await db.TicketLineas.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id);
+            esNuevo = false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        if (edicion.TicketId is null || edicion.ArticuloId is null)
+        {
+            error = "Hay que elegir un ticket y un artículo.";
+            return;
+        }
+
+        edicion.Subtotal = Subtotal;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.TicketLineas.Add(edicion);
+            }
+            else
+            {
+                db.TicketLineas.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.TicketLineas.Where(l => l.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar la línea: {ex.Message}";
+        }
+    }
+
+    private record Fila(
+        long Id,
+        long? TicketId,
+        long? ArticuloId,
+        decimal? PrecioUnidad,
+        int? Unidades,
+        decimal? Subtotal);
+
+    private record Opcion(long Id, string Texto);
+}

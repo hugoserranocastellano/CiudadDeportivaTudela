@@ -1,94 +1,325 @@
 @page "/socios"
-@attribute [StreamRendering]
+@rendermode InteractiveServer
+@attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IConfiguration Configuration
 
 <PageTitle>Socios</PageTitle>
 
-<h1>Socios</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Socios</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nuevo socio</button>
+</div>
 
 @if (error is not null)
 {
     <div class="alert alert-danger" role="alert">
-        <h4 class="alert-heading">No se pudo conectar a Supabase</h4>
+        <h5 class="alert-heading">No se pudo completar la operación</h5>
         <p class="mb-0"><code>@error</code></p>
+        @if (diagnostico is not null)
+        {
+            <hr />
+            <p class="mb-0"><small>Parámetros de conexión: <code>@diagnostico</code></small></p>
+        }
     </div>
 }
-else if (socios is null)
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <DataAnnotationsValidator />
+        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo socio" : $"Editar socio nº {edicion.NumeroSocio}")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Nº socio</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.NumeroSocio" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">DNI</label>
+                    <InputText class="form-control" @bind-Value="edicion.Dni" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Nombre</label>
+                    <InputText class="form-control" @bind-Value="edicion.Nombre" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Apellidos</label>
+                    <InputText class="form-control" @bind-Value="edicion.Apellidos" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Teléfono</label>
+                    <InputText class="form-control" @bind-Value="edicion.Telefono" />
+                    <div class="form-text">Es también su contraseña de acceso.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Email</label>
+                    <InputText class="form-control" @bind-Value="edicion.Email" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Categoría</label>
+                    <InputText class="form-control" @bind-Value="edicion.Categoria" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cargo</label>
+                    <InputText class="form-control" @bind-Value="edicion.Cargo" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nº de cuenta</label>
+                    <InputText class="form-control" @bind-Value="edicion.NumeroCuenta" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">URL de la foto</label>
+                    <InputText class="form-control" @bind-Value="edicion.UrlFoto" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Fecha de alta</label>
+                    <InputDate class="form-control" @bind-Value="edicion.FechaAlta" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="activo" id="socioActivo" />
+                        <label class="form-check-label" for="socioActivo">Activo</label>
+                    </div>
+                </div>
+            </div>
+            <ValidationSummary class="mt-3 small" />
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+<div class="mb-3" style="max-width: 22rem;">
+    <input class="form-control" placeholder="Buscar por nombre, nº o teléfono"
+           value="@filtro" @oninput="e => filtro = e.Value?.ToString() ?? string.Empty" />
+</div>
+
+@if (socios is null)
 {
     <p><em>Cargando...</em></p>
 }
-else if (socios.Count == 0)
+else if (Filtrados.Count == 0)
 {
-    <p><em>No hay socios activos.</em></p>
+    <p><em>No hay socios que coincidan.</em></p>
 }
 else
 {
-    <p>@socios.Count socio(s) activo(s).</p>
+    <p class="text-muted">@Filtrados.Count de @socios.Count socio(s).</p>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nº socio</th>
-                <th>Nombre</th>
-                <th>Apellidos</th>
-                <th>Categoría</th>
-                <th>Teléfono</th>
-                <th>Email</th>
-                <th>Fecha de alta</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var socio in socios)
-            {
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
                 <tr>
-                    <td>@socio.NumeroSocio</td>
-                    <td>@socio.Nombre</td>
-                    <td>@socio.Apellidos</td>
-                    <td>@socio.Categoria</td>
-                    <td>@socio.Telefono</td>
-                    <td>@socio.Email</td>
-                    <td>@socio.FechaAlta?.ToShortDateString()</td>
+                    <th>Nº</th>
+                    <th>Nombre</th>
+                    <th>Apellidos</th>
+                    <th>Categoría</th>
+                    <th>Cargo</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th>Alta</th>
+                    <th>Activo</th>
+                    <th class="text-end">Acciones</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var socio in Filtrados)
+                {
+                    <tr>
+                        <td>@socio.NumeroSocio</td>
+                        <td>@socio.Nombre</td>
+                        <td>@socio.Apellidos</td>
+                        <td>@socio.Categoria</td>
+                        <td>@socio.Cargo</td>
+                        <td>@socio.Telefono</td>
+                        <td>@socio.Email</td>
+                        <td>@socio.FechaAlta?.ToShortDateString()</td>
+                        <td>@(socio.Activo == true ? "Sí" : "No")</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(socio)">Editar</button>
+                            @if (idBorrando == socio.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(socio.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = socio.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
-    private List<SocioListado>? socios;
+    private List<Socio>? socios;
+    private Socio? edicion;
+    private bool esNuevo;
+    private bool activo = true;
+    private long? idBorrando;
+    private string filtro = string.Empty;
     private string? error;
+    private string? diagnostico;
 
-    protected override async Task OnInitializedAsync()
+    private List<Socio> Filtrados
+    {
+        get
+        {
+            if (socios is null)
+            {
+                return new List<Socio>();
+            }
+
+            if (string.IsNullOrWhiteSpace(filtro))
+            {
+                return socios;
+            }
+
+            var texto = filtro.Trim();
+
+            return socios.Where(s =>
+                s.NumeroSocio.ToString().Contains(texto, StringComparison.OrdinalIgnoreCase)
+                || s.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
+                || (s.Apellidos?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (s.Telefono?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+        }
+    }
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
     {
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
             socios = await db.Socios
-                .Where(s => s.Activo == true)
+                .AsNoTracking()
                 .OrderBy(s => s.NumeroSocio)
-                .Select(s => new SocioListado(
-                    s.NumeroSocio,
-                    s.Nombre,
-                    s.Apellidos,
-                    s.Categoria,
-                    s.Telefono,
-                    s.Email,
-                    s.FechaAlta))
                 .ToListAsync();
+
+            error = null;
+            diagnostico = null;
+        }
+        catch (Exception ex)
+        {
+            socios ??= new List<Socio>();
+            error = ex.Message;
+            DescribirConexion();
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new Socio
+        {
+            NumeroSocio = (socios?.Count > 0 ? socios.Max(s => s.NumeroSocio) : 0) + 1,
+            FechaAlta = DateTime.Today,
+        };
+        activo = true;
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private void Editar(Socio socio)
+    {
+        // Copia para que cancelar no deje la fila de la tabla a medio editar.
+        edicion = new Socio
+        {
+            Id = socio.Id,
+            NumeroSocio = socio.NumeroSocio,
+            Dni = socio.Dni,
+            Nombre = socio.Nombre,
+            Apellidos = socio.Apellidos,
+            Telefono = socio.Telefono,
+            Email = socio.Email,
+            UrlFoto = socio.UrlFoto,
+            PinHash = socio.PinHash,
+            PatronHash = socio.PatronHash,
+            Categoria = socio.Categoria,
+            Cargo = socio.Cargo,
+            NumeroCuenta = socio.NumeroCuenta,
+            Activo = socio.Activo,
+            FechaAlta = socio.FechaAlta,
+        };
+        activo = socio.Activo != false;
+        esNuevo = false;
+        idBorrando = null;
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        edicion.Activo = activo;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.Socios.Add(edicion);
+            }
+            else
+            {
+                db.Socios.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
         }
         catch (Exception ex)
         {
             error = ex.Message;
+            DescribirConexion();
         }
     }
 
-    private record SocioListado(
-        int NumeroSocio,
-        string Nombre,
-        string? Apellidos,
-        string Categoria,
-        string? Telefono,
-        string? Email,
-        DateTime? FechaAlta);
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.Socios.Where(s => s.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar el socio (puede tener tickets o reservas asociados): {ex.Message}";
+        }
+    }
+
+    // Un 28P01 no dice qué usuario/host se usó. Mostrarlo aquí (sin la contraseña)
+    // evita tener que adivinar a base de despliegues.
+    private void DescribirConexion()
+    {
+        try
+        {
+            var raw = Configuration.GetConnectionString("Supabase");
+            diagnostico = string.IsNullOrWhiteSpace(raw)
+                ? null
+                : PostgresConnectionString.Describe(PostgresConnectionString.Normalize(raw));
+        }
+        catch (Exception diagEx)
+        {
+            diagnostico = diagEx.Message;
+        }
+    }
 }

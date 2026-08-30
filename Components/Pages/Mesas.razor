@@ -1,0 +1,223 @@
+@page "/mesas"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Mesas</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Mesas</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nueva mesa</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <DataAnnotationsValidator />
+        <div class="card-header fw-semibold">@(esNuevo ? "Nueva mesa" : $"Editar «{edicion.Descripcion}»")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Descripción</label>
+                    <InputText class="form-control" @bind-Value="edicion.Descripcion" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Estancia</label>
+                    <InputText class="form-control" list="estancias" @bind-Value="edicion.Estancia" />
+                    <datalist id="estancias">
+                        @foreach (var estancia in Estancias)
+                        {
+                            <option value="@estancia" />
+                        }
+                    </datalist>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Capacidad</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.Capacidad" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="activa" id="mesaActiva" />
+                        <label class="form-check-label" for="mesaActiva">Activa</label>
+                    </div>
+                </div>
+            </div>
+            <ValidationSummary class="mt-3 small" />
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@if (mesas is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (mesas.Count == 0)
+{
+    <p><em>No hay mesas todavía.</em></p>
+}
+else
+{
+    <p class="text-muted">
+        @mesas.Count mesa(s), @(mesas.Where(m => m.Activa != false).Sum(m => m.Capacidad)) plaza(s) activas.
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Descripción</th>
+                    <th>Estancia</th>
+                    <th class="text-end">Capacidad</th>
+                    <th>Activa</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var mesa in mesas)
+                {
+                    <tr>
+                        <td>@mesa.Descripcion</td>
+                        <td>@mesa.Estancia</td>
+                        <td class="text-end">@mesa.Capacidad</td>
+                        <td>@(mesa.Activa == true ? "Sí" : "No")</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(mesa)">Editar</button>
+                            @if (idBorrando == mesa.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(mesa.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = mesa.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Mesa>? mesas;
+    private Mesa? edicion;
+    private bool esNuevo;
+    private bool activa = true;
+    private long? idBorrando;
+    private string? error;
+
+    private IEnumerable<string> Estancias => mesas is null
+        ? Array.Empty<string>()
+        : mesas.Select(m => m.Estancia)
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e!)
+            .Distinct()
+            .OrderBy(e => e);
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            mesas = await db.Mesas
+                .AsNoTracking()
+                .OrderBy(m => m.Estancia)
+                .ThenBy(m => m.Descripcion)
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            mesas ??= new List<Mesa>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new Mesa();
+        activa = true;
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private void Editar(Mesa mesa)
+    {
+        edicion = new Mesa
+        {
+            Id = mesa.Id,
+            Descripcion = mesa.Descripcion,
+            Estancia = mesa.Estancia,
+            Capacidad = mesa.Capacidad,
+            Activa = mesa.Activa,
+        };
+        activa = mesa.Activa != false;
+        esNuevo = false;
+        idBorrando = null;
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        edicion.Activa = activa;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.Mesas.Add(edicion);
+            }
+            else
+            {
+                db.Mesas.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.Mesas.Where(m => m.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar la mesa (puede estar asignada a alguna reserva): {ex.Message}";
+        }
+    }
+}

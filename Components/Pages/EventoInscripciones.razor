@@ -1,0 +1,264 @@
+@page "/evento-inscripciones"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Inscripciones a eventos</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Inscripciones a eventos</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nueva inscripción</button>
+</div>
+
+<p class="text-muted">
+    La tabla <code>eventos</code> todavía no tiene pantalla propia, así que el evento
+    se indica por su número de identificador.
+</p>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <div class="card-header fw-semibold">@(esNuevo ? "Nueva inscripción" : $"Editar inscripción #{edicion.Id}")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Id del evento</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.EventoId" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Socio</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.SocioId">
+                        <option value="">(elige un socio)</option>
+                        @foreach (var socio in socios)
+                        {
+                            <option value="@socio.Id">@socio.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="acude" id="insAcude" />
+                        <label class="form-check-label" for="insAcude">Acude</label>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="listaEspera" id="insEspera" />
+                        <label class="form-check-label" for="insEspera">Lista de espera</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@if (inscripciones is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (inscripciones.Count == 0)
+{
+    <p><em>No hay inscripciones registradas.</em></p>
+}
+else
+{
+    <p class="text-muted">
+        @inscripciones.Count inscripción(es),
+        @(inscripciones.Count(i => i.ListaEspera == true)) en lista de espera.
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Evento</th>
+                    <th>Socio</th>
+                    <th>Acude</th>
+                    <th>Lista de espera</th>
+                    <th>Inscripción</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var inscripcion in inscripciones)
+                {
+                    <tr class="@(inscripcion.ListaEspera == true ? "table-warning" : null)">
+                        <td>@inscripcion.Id</td>
+                        <td>@inscripcion.EventoId</td>
+                        <td>@NombreSocio(inscripcion.SocioId)</td>
+                        <td>@(inscripcion.Acude == true ? "Sí" : "No")</td>
+                        <td>@(inscripcion.ListaEspera == true ? "Sí" : "No")</td>
+                        <td>@inscripcion.FechaInscripcion?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(inscripcion.Id)">Editar</button>
+                            @if (idBorrando == inscripcion.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(inscripcion.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = inscripcion.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? inscripciones;
+    private List<Opcion> socios = new();
+    private Dictionary<long, string> nombresSocio = new();
+    private EventoInscripcion? edicion;
+    private bool esNuevo;
+    private bool acude = true;
+    private bool listaEspera;
+    private long? idBorrando;
+    private string? error;
+
+    private string NombreSocio(long? id) =>
+        id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "—";
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socios = (await db.Socios
+                    .AsNoTracking()
+                    .OrderBy(s => s.NumeroSocio)
+                    .Select(s => new { s.Id, s.NumeroSocio, s.Nombre, s.Apellidos })
+                    .ToListAsync())
+                .Select(s => new Opcion(s.Id, $"{s.NumeroSocio} · {s.Nombre} {s.Apellidos}".TrimEnd()))
+                .ToList();
+
+            nombresSocio = socios.ToDictionary(s => s.Id, s => s.Texto);
+
+            inscripciones = await db.EventoInscripciones
+                .AsNoTracking()
+                .OrderByDescending(i => i.EventoId)
+                .ThenBy(i => i.FechaInscripcion)
+                .Select(i => new Fila(i.Id, i.EventoId, i.SocioId, i.Acude, i.ListaEspera, i.FechaInscripcion))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            inscripciones ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new EventoInscripcion();
+        acude = true;
+        listaEspera = false;
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private async Task Editar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            edicion = await db.EventoInscripciones.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id);
+            acude = edicion?.Acude != false;
+            listaEspera = edicion?.ListaEspera == true;
+            esNuevo = false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        if (edicion.EventoId is null || edicion.SocioId is null)
+        {
+            error = "Hay que indicar el evento y el socio.";
+            return;
+        }
+
+        edicion.Acude = acude;
+        edicion.ListaEspera = listaEspera;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.EventoInscripciones.Add(edicion);
+            }
+            else
+            {
+                db.EventoInscripciones.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.EventoInscripciones.Where(i => i.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar la inscripción: {ex.Message}";
+        }
+    }
+
+    private record Fila(
+        long Id,
+        long? EventoId,
+        long? SocioId,
+        bool? Acude,
+        bool? ListaEspera,
+        DateTime? FechaInscripcion);
+
+    private record Opcion(long Id, string Texto);
+}

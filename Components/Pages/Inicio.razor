@@ -1,0 +1,33 @@
+@page "/inicio"
+@attribute [Authorize]
+
+<PageTitle>Inicio · Peña Ciudad Deportiva</PageTitle>
+
+<h1>Bienvenido@(string.IsNullOrWhiteSpace(nombre) ? "" : $", {nombre}")</h1>
+
+<p class="lead">Peña Ciudad Deportiva de Tudela.</p>
+
+<div class="alert alert-light border-start border-4 border-danger">
+    Desde el menú de la izquierda puedes consultar los socios, el bar y el almacén,
+    las reservas de comedor y las cuentas de la sociedad.
+</div>
+
+<p class="text-muted">Aquí iremos añadiendo las opciones del día a día de la peña.</p>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private string? nombre;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        nombre = estado.User.Identity?.Name;
+    }
+}

@@ -2,18 +2,44 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-a, .btn-link {
-    color: #006bb7;
+/* Identidad de la peña: rojo y blanco. */
+:root {
+    --pena-rojo: #c8102e;
+    --pena-rojo-oscuro: #8e0e14;
 }
 
-.btn-primary {
+a, .btn-link {
+    color: var(--pena-rojo-oscuro);
+}
+
+.btn-primary, .btn-pena {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: var(--pena-rojo);
+    border-color: var(--pena-rojo-oscuro);
+}
+
+.btn-primary:hover, .btn-pena:hover, .btn-primary:focus, .btn-pena:focus {
+    color: #fff;
+    background-color: var(--pena-rojo-oscuro);
+    border-color: var(--pena-rojo-oscuro);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(200, 16, 46, 0.45);
+}
+
+.form-check-input:checked {
+    background-color: var(--pena-rojo);
+    border-color: var(--pena-rojo-oscuro);
+}
+
+h1, h2 {
+    color: var(--pena-rojo-oscuro);
+}
+
+.table thead th {
+    color: var(--pena-rojo-oscuro);
+    border-bottom-width: 2px;
 }
 
 .content {

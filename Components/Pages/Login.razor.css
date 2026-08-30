@@ -1,0 +1,8 @@
+.login-logo {
+    width: 7.5rem;
+    height: 7.5rem;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #c8102e;
+    background-color: #fff;
+}

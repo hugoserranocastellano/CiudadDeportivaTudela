@@ -1,0 +1,276 @@
+@page "/tickets"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Tickets</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Tickets</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nuevo ticket</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo ticket" : $"Editar ticket #{edicion.Id}")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Fecha y hora</label>
+                    <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="edicion.Fecha" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Socio</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.SocioId">
+                        <option value="">(sin socio)</option>
+                        @foreach (var socio in socios)
+                        {
+                            <option value="@socio.Id">@socio.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Importe total (€)</label>
+                    <InputNumber class="form-control" step="0.01" @bind-Value="edicion.ImporteTotal" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="revisado" id="ticketRevisado" />
+                        <label class="form-check-label" for="ticketRevisado">Revisado</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">URL de la foto del ticket</label>
+                    <InputText class="form-control" @bind-Value="edicion.UrlFotoTicket" />
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@if (tickets is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (tickets.Count == 0)
+{
+    <p><em>No hay tickets registrados.</em></p>
+}
+else
+{
+    <p class="text-muted">
+        @tickets.Count ticket(s), @(tickets.Sum(t => t.ImporteTotal ?? 0).ToString("N2")) € en total,
+        @(tickets.Count(t => t.Revisado != true)) sin revisar.
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Socio</th>
+                    <th class="text-end">Líneas</th>
+                    <th class="text-end">Importe</th>
+                    <th>Revisado</th>
+                    <th>Foto</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ticket in tickets)
+                {
+                    <tr class="@(ticket.Revisado == true ? null : "table-warning")">
+                        <td>@ticket.Id</td>
+                        <td>@ticket.Fecha?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@NombreSocio(ticket.SocioId)</td>
+                        <td class="text-end">@ticket.NumeroLineas</td>
+                        <td class="text-end">@((ticket.ImporteTotal ?? 0).ToString("N2")) €</td>
+                        <td>@(ticket.Revisado == true ? "Sí" : "No")</td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
+                            {
+                                <a href="@ticket.UrlFotoTicket" target="_blank" rel="noopener">Ver</a>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(ticket.Id)">Editar</button>
+                            @if (idBorrando == ticket.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(ticket.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = ticket.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? tickets;
+    private List<Opcion> socios = new();
+    private Dictionary<long, string> nombresSocio = new();
+    private Ticket? edicion;
+    private bool esNuevo;
+    private bool revisado;
+    private long? idBorrando;
+    private string? error;
+
+    private string NombreSocio(long? id) =>
+        id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "—";
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socios = (await db.Socios
+                    .AsNoTracking()
+                    .OrderBy(s => s.NumeroSocio)
+                    .Select(s => new { s.Id, s.NumeroSocio, s.Nombre, s.Apellidos })
+                    .ToListAsync())
+                .Select(s => new Opcion(s.Id, $"{s.NumeroSocio} · {s.Nombre} {s.Apellidos}".TrimEnd()))
+                .ToList();
+
+            nombresSocio = socios.ToDictionary(s => s.Id, s => s.Texto);
+
+            tickets = await db.Tickets
+                .AsNoTracking()
+                .OrderByDescending(t => t.Fecha)
+                .ThenByDescending(t => t.Id)
+                .Select(t => new Fila(
+                    t.Id,
+                    t.Fecha,
+                    t.SocioId,
+                    t.ImporteTotal,
+                    t.Revisado,
+                    t.UrlFotoTicket,
+                    t.Lineas.Count))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            tickets ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new Ticket
+        {
+            // Kind Unspecified: la columna es timestamp without time zone.
+            Fecha = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified),
+        };
+        revisado = false;
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private async Task Editar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            edicion = await db.Tickets.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+            revisado = edicion?.Revisado == true;
+            esNuevo = false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        edicion.Revisado = revisado;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.Tickets.Add(edicion);
+            }
+            else
+            {
+                db.Tickets.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // ticket_lineas cae en cascada; movimientos_stock no, así que primero
+            // se suelta la referencia para que el borrado no choque con la FK.
+            await db.MovimientosStock
+                .Where(m => m.TicketId == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.TicketId, (long?)null));
+
+            await db.Tickets.Where(t => t.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar el ticket: {ex.Message}";
+        }
+    }
+
+    private record Fila(
+        long Id,
+        DateTime? Fecha,
+        long? SocioId,
+        decimal? ImporteTotal,
+        bool? Revisado,
+        string? UrlFotoTicket,
+        int NumeroLineas);
+
+    private record Opcion(long Id, string Texto);
+}

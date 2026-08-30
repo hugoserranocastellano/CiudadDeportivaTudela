@@ -1,0 +1,236 @@
+@page "/gastos-sociedad"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Gastos de la sociedad</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Gastos de la sociedad</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nuevo gasto</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <DataAnnotationsValidator />
+        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo gasto" : "Editar gasto")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Fecha</label>
+                    <InputDate class="form-control" @bind-Value="edicion.Fecha" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Categoría</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.CategoriaId">
+                        <option value="">(sin categoría)</option>
+                        @foreach (var categoria in categorias)
+                        {
+                            <option value="@categoria.Id">@categoria.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cantidad (€)</label>
+                    <InputNumber class="form-control" step="0.01" @bind-Value="edicion.Cantidad" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Descripción</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="edicion.Descripcion" />
+                </div>
+            </div>
+            <ValidationSummary class="mt-3 small" />
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@if (gastos is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (gastos.Count == 0)
+{
+    <p><em>No hay gastos registrados.</em></p>
+}
+else
+{
+    <p class="text-muted">@gastos.Count gasto(s), @(gastos.Sum(g => g.Cantidad).ToString("N2")) € en total.</p>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Categoría</th>
+                    <th>Tipo</th>
+                    <th>Descripción</th>
+                    <th class="text-end">Cantidad</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var gasto in gastos)
+                {
+                    <tr>
+                        <td>@gasto.Fecha.ToShortDateString()</td>
+                        <td>@(gasto.Categoria ?? "—")</td>
+                        <td>@gasto.TipoCategoria</td>
+                        <td>@gasto.Descripcion</td>
+                        <td class="text-end">@gasto.Cantidad.ToString("N2") €</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(gasto.Id)">Editar</button>
+                            @if (idBorrando == gasto.Id)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(gasto.Id)">Confirmar</button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = gasto.Id">Borrar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? gastos;
+    private List<Opcion> categorias = new();
+    private GastoSociedad? edicion;
+    private bool esNuevo;
+    private long? idBorrando;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            gastos = await db.GastosSociedad
+                .AsNoTracking()
+                .OrderByDescending(g => g.Fecha)
+                .ThenByDescending(g => g.Id)
+                .Select(g => new Fila(
+                    g.Id,
+                    g.Fecha,
+                    g.Categoria!.Descripcion,
+                    g.Categoria!.TipoCategoria,
+                    g.Descripcion,
+                    g.Cantidad))
+                .ToListAsync();
+
+            categorias = await db.CategoriasGasto
+                .AsNoTracking()
+                .OrderBy(c => c.Descripcion)
+                .Select(c => new Opcion(c.Id, c.Descripcion + " (" + c.TipoCategoria + ")"))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            gastos ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new GastoSociedad();
+        esNuevo = true;
+        idBorrando = null;
+    }
+
+    private async Task Editar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // Sin Include: al guardar sólo debe viajar el gasto, no su categoría.
+            edicion = await db.GastosSociedad.AsNoTracking().FirstOrDefaultAsync(g => g.Id == id);
+            esNuevo = false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.GastosSociedad.Add(edicion);
+            }
+            else
+            {
+                db.GastosSociedad.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.GastosSociedad.Where(g => g.Id == id).ExecuteDeleteAsync();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = $"No se pudo borrar el gasto: {ex.Message}";
+        }
+    }
+
+    private record Fila(
+        long Id,
+        DateOnly Fecha,
+        string? Categoria,
+        string? TipoCategoria,
+        string? Descripcion,
+        decimal Cantidad);
+
+    private record Opcion(long Id, string Texto);
+}

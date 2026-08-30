@@ -1,0 +1,139 @@
+@page "/"
+@layout LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using CiudadDeportivaTudela.Services
+@using Microsoft.AspNetCore.Authentication
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+
+@* Sin render mode interactivo a propósito: SignInAsync necesita el HttpContext
+   de la petición, que sólo existe mientras la página se renderiza en servidor. *@
+
+<PageTitle>Acceso · Peña Ciudad Deportiva</PageTitle>
+
+<div class="text-center mb-4">
+    <img src="images/pena_ciudad-deportiva.jpg" alt="Peña Ciudad Deportiva" class="login-logo" />
+    <h1 class="h4 mt-3 mb-1">Peña Ciudad Deportiva</h1>
+    <p class="text-muted small mb-0">Tudela</p>
+</div>
+
+@if (mensajeError is not null)
+{
+    <div class="alert alert-danger py-2" role="alert">@mensajeError</div>
+}
+
+<EditForm Model="Entrada" FormName="acceso" OnValidSubmit="Acceder" method="post">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label for="numeroSocio" class="form-label">Número de socio</label>
+        <InputNumber id="numeroSocio" class="form-control" @bind-Value="Entrada!.NumeroSocio"
+                     autocomplete="username" placeholder="Ej. 42" />
+        <ValidationMessage For="() => Entrada!.NumeroSocio" class="small" />
+    </div>
+
+    <div class="mb-4">
+        <label for="telefono" class="form-label">Teléfono</label>
+        <InputText id="telefono" type="password" class="form-control" @bind-Value="Entrada!.Telefono"
+                   autocomplete="current-password" placeholder="Tu teléfono" />
+        <ValidationMessage For="() => Entrada!.Telefono" class="small" />
+        <div class="form-text">Tu contraseña es el teléfono que tiene la peña registrado.</div>
+    </div>
+
+    <button type="submit" class="btn btn-pena w-100">Entrar</button>
+</EditForm>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    // El nombre de esta propiedad es el prefijo de los campos del formulario
+    // (Entrada.NumeroSocio, Entrada.Telefono): si se renombra, el POST no enlaza.
+    // Se materializa en OnInitialized y no con un inicializador, que avisaría BL0008.
+    [SupplyParameterFromForm]
+    private DatosAcceso? Entrada { get; set; }
+
+    [SupplyParameterFromQuery(Name = "volverA")]
+    private string? VolverA { get; set; }
+
+    private string? mensajeError;
+
+    protected override void OnInitialized()
+    {
+        Entrada ??= new DatosAcceso();
+
+        // Quien ya tiene la cookie no necesita volver a identificarse.
+        if (HttpContext?.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo(DestinoSeguro(), forceLoad: false);
+        }
+    }
+
+    private async Task Acceder()
+    {
+        var datos = Entrada!;
+
+        if (HttpContext is null)
+        {
+            mensajeError = "No se puede iniciar sesión en este momento. Recarga la página.";
+            return;
+        }
+
+        Socio? socio;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socio = await db.Socios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.NumeroSocio == datos.NumeroSocio);
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"No se pudo consultar la base de datos: {ex.Message}";
+            return;
+        }
+
+        // Un único mensaje para socio inexistente y teléfono incorrecto: así no se
+        // puede averiguar qué números de socio existen probando uno a uno.
+        if (socio is null || !SocioAuth.TelefonoCoincide(socio, datos.Telefono))
+        {
+            mensajeError = "Número de socio o teléfono incorrectos.";
+            return;
+        }
+
+        if (socio.Activo == false)
+        {
+            mensajeError = "Este socio no está activo. Habla con la junta.";
+            return;
+        }
+
+        await HttpContext.SignInAsync(SocioAuth.Scheme, SocioAuth.CrearPrincipal(socio));
+
+        Navigation.NavigateTo(DestinoSeguro(), forceLoad: true);
+    }
+
+    // Sólo rutas internas: un volverA con http:// sería un redirect abierto.
+    private string DestinoSeguro()
+    {
+        if (string.IsNullOrWhiteSpace(VolverA)
+            || VolverA.StartsWith("//", StringComparison.Ordinal)
+            || VolverA.Contains("://", StringComparison.Ordinal))
+        {
+            return "inicio";
+        }
+
+        return VolverA.TrimStart('/');
+    }
+
+    private sealed class DatosAcceso
+    {
+        [Required(ErrorMessage = "Indica tu número de socio.")]
+        [Range(1, int.MaxValue, ErrorMessage = "El número de socio debe ser positivo.")]
+        public int? NumeroSocio { get; set; }
+
+        [Required(ErrorMessage = "Indica tu teléfono.")]
+        public string? Telefono { get; set; }
+    }
+}

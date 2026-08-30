@@ -1,0 +1,16 @@
+@inject NavigationManager Navigation
+
+@code {
+    // Se ejecuta tanto en SSR como en el circuito interactivo: quien no está
+    // identificado acaba siempre en la pantalla de acceso.
+    protected override void OnInitialized()
+    {
+        var destino = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        var login = string.IsNullOrEmpty(destino)
+            ? "/"
+            : $"/?volverA={Uri.EscapeDataString(destino)}";
+
+        Navigation.NavigateTo(login, forceLoad: false);
+    }
+}
