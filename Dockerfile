@@ -13,6 +13,16 @@ WORKDIR /app
 COPY --from=build /app/publish ./
 
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+# El límite de instancias inotify (fs.inotify.max_user_instances) es del host y Render lo
+# reparte entre todos los contenedores. Los watchers de .NET lo agotan y CreateBuilder muere
+# con "The configured user limit (128) on the number of inotify instances has been reached".
+# Con estas dos variables la app no abre ni una instancia inotify:
+#   - no recargar la configuración al cambiar los appsettings (en producción no cambian),
+#   - y que cualquier watcher restante (wwwroot, assets estáticos) use sondeo en vez de inotify.
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+
 EXPOSE 8080
 
 # Render inyecta $PORT. exec deja a dotnet como PID 1 para que reciba el SIGTERM del apagado.
