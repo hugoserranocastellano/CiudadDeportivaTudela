@@ -10,6 +10,14 @@ RUN dotnet publish CiudadDeportivaTudela.csproj -c Release -o /app/publish /p:Us
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# Npgsql carga GSSAPI al negociar la autenticación con el servidor, y la imagen de aspnet
+# no trae Kerberos: sin esto la conexión muere con "Cannot load library libgssapi_krb5.so.2".
+# Va antes del COPY para que la capa se cachee entre despliegues.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish ./
 
 ENV ASPNETCORE_ENVIRONMENT=Production
