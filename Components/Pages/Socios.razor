@@ -1,0 +1,94 @@
+@page "/socios"
+@attribute [StreamRendering]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Socios</PageTitle>
+
+<h1>Socios</h1>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">No se pudo conectar a Supabase</h4>
+        <p class="mb-0"><code>@error</code></p>
+    </div>
+}
+else if (socios is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (socios.Count == 0)
+{
+    <p><em>No hay socios activos.</em></p>
+}
+else
+{
+    <p>@socios.Count socio(s) activo(s).</p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nº socio</th>
+                <th>Nombre</th>
+                <th>Apellidos</th>
+                <th>Categoría</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+                <th>Fecha de alta</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var socio in socios)
+            {
+                <tr>
+                    <td>@socio.NumeroSocio</td>
+                    <td>@socio.Nombre</td>
+                    <td>@socio.Apellidos</td>
+                    <td>@socio.Categoria</td>
+                    <td>@socio.Telefono</td>
+                    <td>@socio.Email</td>
+                    <td>@socio.FechaAlta?.ToShortDateString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<SocioListado>? socios;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socios = await db.Socios
+                .Where(s => s.Activo == true)
+                .OrderBy(s => s.NumeroSocio)
+                .Select(s => new SocioListado(
+                    s.NumeroSocio,
+                    s.Nombre,
+                    s.Apellidos,
+                    s.Categoria,
+                    s.Telefono,
+                    s.Email,
+                    s.FechaAlta))
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record SocioListado(
+        int NumeroSocio,
+        string Nombre,
+        string? Apellidos,
+        string Categoria,
+        string? Telefono,
+        string? Email,
+        DateTime? FechaAlta);
+}
