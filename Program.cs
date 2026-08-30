@@ -19,8 +19,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
-var connectionString = builder.Configuration.GetConnectionString("Supabase")
-    ?? throw new InvalidOperationException("Falta la cadena de conexión 'Supabase'.");
+var rawConnectionString = builder.Configuration.GetConnectionString("Supabase");
+if (string.IsNullOrWhiteSpace(rawConnectionString))
+{
+    throw new InvalidOperationException("Falta la cadena de conexión 'Supabase'.");
+}
+
+// Acepta tanto el formato clave=valor como la URI postgresql:// que copia Supabase.
+var connectionString = PostgresConnectionString.Normalize(rawConnectionString);
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
