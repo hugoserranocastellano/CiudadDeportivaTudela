@@ -1,24 +1,216 @@
 @page "/inicio"
+@rendermode InteractiveServer
 @attribute [Authorize]
+@using System.ComponentModel.DataAnnotations
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Inicio · Peña Ciudad Deportiva</PageTitle>
 
-<h1>Bienvenido@(string.IsNullOrWhiteSpace(nombre) ? "" : $", {nombre}")</h1>
+@if (socio is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <h1 class="mb-0">Bienvenido, @socio.Nombre</h1>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="AbrirEdicionDatos">Editar mis datos</button>
+    </div>
 
-<p class="lead">Peña Ciudad Deportiva de Tudela.</p>
+    @if (mensaje is not null)
+    {
+        <div class="alert alert-success py-2">@mensaje</div>
+    }
+    @if (error is not null)
+    {
+        <div class="alert alert-danger py-2"><code>@error</code></div>
+    }
 
-<div class="alert alert-light border-start border-4 border-danger">
-    Desde el menú de la izquierda puedes consultar los socios, el bar y el almacén,
-    las reservas de comedor y las cuentas de la sociedad.
-</div>
+    @if (editandoDatos)
+    {
+        <EditForm Model="datosEdicion" OnValidSubmit="GuardarDatos" class="card mb-4">
+            <DataAnnotationsValidator />
+            <div class="card-header fw-semibold">Editar mis datos</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.Nombre" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Apellidos</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.Apellidos" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Teléfono</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.Telefono" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.Email" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">URL de la foto</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.UrlFoto" />
+                    </div>
+                </div>
+                <ValidationSummary class="mt-3 small" />
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-pena">Guardar</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => editandoDatos = false">Cancelar</button>
+            </div>
+        </EditForm>
+    }
 
-<p class="text-muted">Aquí iremos añadiendo las opciones del día a día de la peña.</p>
+    <div class="card mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <div>
+                <div class="text-muted small">Cuenta bancaria</div>
+                <div class="fs-5">
+                    @(mostrarCuenta ? (string.IsNullOrWhiteSpace(socio.NumeroCuenta) ? "(sin registrar)" : socio.NumeroCuenta) : Ocultar(socio.NumeroCuenta))
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => mostrarCuenta = !mostrarCuenta">
+                @(mostrarCuenta ? "Ocultar" : "Ver")
+            </button>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <button class="btn btn-pena" @onclick="AbrirNuevoTicket">Nuevo ticket</button>
+        <button class="btn btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
+        <button class="btn btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
+    </div>
+
+    @if (accion == Accion.Ticket)
+    {
+        <EditForm Model="nuevoTicket" OnValidSubmit="GuardarTicket" class="card mb-4">
+            <div class="card-header fw-semibold">Nuevo ticket</div>
+            <div class="card-body row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Importe total (€)</label>
+                    <InputNumber class="form-control" step="0.01" @bind-Value="nuevoTicket!.ImporteTotal" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">URL de la foto del ticket (opcional)</label>
+                    <InputText class="form-control" @bind-Value="nuevoTicket!.UrlFotoTicket" />
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-pena">Guardar</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CerrarAccion">Cancelar</button>
+            </div>
+        </EditForm>
+    }
+
+    @if (accion == Accion.Reserva)
+    {
+        <EditForm Model="nuevaReserva" OnValidSubmit="GuardarReserva" class="card mb-4">
+            <DataAnnotationsValidator />
+            <div class="card-header fw-semibold">Nueva reserva</div>
+            <div class="card-body row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Fecha</label>
+                    <InputDate class="form-control" @bind-Value="nuevaReserva!.Fecha" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Comensales</label>
+                    <InputNumber class="form-control" @bind-Value="nuevaReserva!.Comensales" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    <InputText class="form-control" @bind-Value="nuevaReserva!.TipoReserva" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="limpieza" id="reservaLimpieza" />
+                        <label class="form-check-label" for="reservaLimpieza">Servicio de limpieza</label>
+                    </div>
+                </div>
+                <ValidationSummary class="mt-3 small" />
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-pena">Guardar</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CerrarAccion">Cancelar</button>
+            </div>
+        </EditForm>
+    }
+
+    @if (accion == Accion.Sugerencia)
+    {
+        <EditForm Model="nuevaSugerencia" OnValidSubmit="GuardarSugerencia" class="card mb-4">
+            <DataAnnotationsValidator />
+            <div class="card-header fw-semibold">Enviar sugerencia</div>
+            <div class="card-body">
+                <label class="form-label">Tu sugerencia</label>
+                <InputTextArea class="form-control" rows="4" @bind-Value="nuevaSugerencia!.Descripcion" />
+                <ValidationSummary class="mt-3 small" />
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-pena">Enviar</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="CerrarAccion">Cancelar</button>
+            </div>
+        </EditForm>
+    }
+
+    <h2 class="h4">Próximos eventos</h2>
+
+    @if (eventos is null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else if (eventos.Count == 0)
+    {
+        <p class="text-muted">No hay eventos programados.</p>
+    }
+    else
+    {
+        <div class="list-group mb-4">
+            @foreach (var evento in eventos)
+            {
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-semibold">@evento.Descripcion</div>
+                        <div class="text-muted small">@evento.Fecha?.ToString("dd/MM/yyyy")</div>
+                    </div>
+                    @if (inscrito.Contains(evento.Id))
+                    {
+                        <span class="badge text-bg-success">Ya inscrito</span>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-pena" @onclick="() => Inscribirse(evento.Id)">Inscribirse</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+}
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
 
-    private string? nombre;
+    private long? socioId;
+    private Socio? socio;
+    private List<Evento>? eventos;
+    private HashSet<long> inscrito = new();
+
+    private bool mostrarCuenta;
+    private bool editandoDatos;
+    private DatosSocio? datosEdicion;
+
+    private enum Accion { Ninguna, Ticket, Reserva, Sugerencia }
+    private Accion accion = Accion.Ninguna;
+
+    private Ticket? nuevoTicket;
+    private Reserva? nuevaReserva;
+    private bool limpieza;
+    private Sugerencia? nuevaSugerencia;
+
+    private string? mensaje;
+    private string? error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -28,6 +220,252 @@
         }
 
         var estado = await EstadoAutenticacion;
-        nombre = estado.User.Identity?.Name;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socio = await db.Socios.AsNoTracking().FirstOrDefaultAsync(s => s.Id == socioId);
+
+            eventos = await db.Eventos
+                .AsNoTracking()
+                .OrderBy(e => e.Fecha)
+                .ToListAsync();
+
+            inscrito = (await db.EventoInscripciones
+                    .AsNoTracking()
+                    .Where(i => i.SocioId == socioId)
+                    .Select(i => i.EventoId)
+                    .ToListAsync())
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .ToHashSet();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            eventos ??= new List<Evento>();
+            error = ex.Message;
+        }
+    }
+
+    private static string Ocultar(string? numeroCuenta)
+    {
+        if (string.IsNullOrWhiteSpace(numeroCuenta))
+        {
+            return "(sin registrar)";
+        }
+
+        // Deja visibles los últimos 4 caracteres, como en un extracto bancario.
+        var visibles = numeroCuenta.Length > 4 ? numeroCuenta[^4..] : numeroCuenta;
+        return new string('•', Math.Max(numeroCuenta.Length - visibles.Length, 4)) + visibles;
+    }
+
+    private void AbrirEdicionDatos()
+    {
+        if (socio is null)
+        {
+            return;
+        }
+
+        datosEdicion = new DatosSocio
+        {
+            Nombre = socio.Nombre,
+            Apellidos = socio.Apellidos,
+            Telefono = socio.Telefono,
+            Email = socio.Email,
+            UrlFoto = socio.UrlFoto,
+        };
+        editandoDatos = true;
+        mensaje = null;
+    }
+
+    private async Task GuardarDatos()
+    {
+        if (socioId is null || datosEdicion is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.Socios.Where(s => s.Id == socioId).ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Nombre, datosEdicion.Nombre)
+                .SetProperty(x => x.Apellidos, datosEdicion.Apellidos)
+                .SetProperty(x => x.Telefono, datosEdicion.Telefono)
+                .SetProperty(x => x.Email, datosEdicion.Email)
+                .SetProperty(x => x.UrlFoto, datosEdicion.UrlFoto));
+
+            editandoDatos = false;
+            mensaje = "Datos actualizados.";
+            error = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void CerrarAccion() => accion = Accion.Ninguna;
+
+    private void AbrirNuevoTicket()
+    {
+        nuevoTicket = new Ticket { Fecha = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified) };
+        accion = Accion.Ticket;
+        mensaje = null;
+    }
+
+    private async Task GuardarTicket()
+    {
+        if (socioId is null || nuevoTicket is null)
+        {
+            return;
+        }
+
+        nuevoTicket.SocioId = socioId;
+        nuevoTicket.Revisado = false;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            db.Tickets.Add(nuevoTicket);
+            await db.SaveChangesAsync();
+
+            accion = Accion.Ninguna;
+            mensaje = "Ticket registrado. La junta lo revisará en breve.";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void AbrirNuevaReserva()
+    {
+        nuevaReserva = new Reserva();
+        limpieza = false;
+        accion = Accion.Reserva;
+        mensaje = null;
+    }
+
+    private async Task GuardarReserva()
+    {
+        if (socioId is null || nuevaReserva is null)
+        {
+            return;
+        }
+
+        nuevaReserva.SocioId = socioId;
+        nuevaReserva.Limpieza = limpieza;
+        nuevaReserva.Estado = "activa";
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            db.Reservas.Add(nuevaReserva);
+            await db.SaveChangesAsync();
+
+            accion = Accion.Ninguna;
+            mensaje = "Reserva creada.";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void AbrirNuevaSugerencia()
+    {
+        nuevaSugerencia = new Sugerencia();
+        accion = Accion.Sugerencia;
+        mensaje = null;
+    }
+
+    private async Task GuardarSugerencia()
+    {
+        if (socioId is null || nuevaSugerencia is null)
+        {
+            return;
+        }
+
+        nuevaSugerencia.SocioId = socioId;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            db.Sugerencias.Add(nuevaSugerencia);
+            await db.SaveChangesAsync();
+
+            accion = Accion.Ninguna;
+            mensaje = "Sugerencia enviada.";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Inscribirse(long eventoId)
+    {
+        if (socioId is null || inscrito.Contains(eventoId))
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            db.EventoInscripciones.Add(new EventoInscripcion
+            {
+                EventoId = eventoId,
+                SocioId = socioId,
+                Acude = true,
+            });
+            await db.SaveChangesAsync();
+
+            inscrito.Add(eventoId);
+            mensaje = "Inscripción registrada.";
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private sealed class DatosSocio
+    {
+        [Required(ErrorMessage = "El nombre es obligatorio.")]
+        public string Nombre { get; set; } = string.Empty;
+
+        public string? Apellidos { get; set; }
+
+        public string? Telefono { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? UrlFoto { get; set; }
     }
 }

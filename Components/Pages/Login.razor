@@ -26,18 +26,18 @@
     <DataAnnotationsValidator />
 
     <div class="mb-3">
-        <label for="numeroSocio" class="form-label">Número de socio</label>
-        <InputNumber id="numeroSocio" class="form-control" @bind-Value="Entrada!.NumeroSocio"
-                     autocomplete="username" placeholder="Ej. 42" />
-        <ValidationMessage For="() => Entrada!.NumeroSocio" class="small" />
+        <label for="dni" class="form-label">DNI</label>
+        <InputText id="dni" class="form-control" @bind-Value="Entrada!.Dni"
+                   autocomplete="username" placeholder="Sólo números, sin la letra" />
+        <ValidationMessage For="() => Entrada!.Dni" class="small" />
     </div>
 
     <div class="mb-4">
-        <label for="telefono" class="form-label">Teléfono</label>
-        <InputText id="telefono" type="password" class="form-control" @bind-Value="Entrada!.Telefono"
-                   autocomplete="current-password" placeholder="Tu teléfono" />
-        <ValidationMessage For="() => Entrada!.Telefono" class="small" />
-        <div class="form-text">Tu contraseña es el teléfono que tiene la peña registrado.</div>
+        <label for="pin" class="form-label">PIN</label>
+        <InputNumber id="pin" type="password" class="form-control" @bind-Value="Entrada!.Pin"
+                     autocomplete="current-password" placeholder="Tu PIN" />
+        <ValidationMessage For="() => Entrada!.Pin" class="small" />
+        <div class="form-text">Tu contraseña es el PIN que tiene la peña registrado.</div>
     </div>
 
     <button type="submit" class="btn btn-pena w-100">Entrar</button>
@@ -81,13 +81,21 @@
 
         Socio? socio;
 
+        var digitosDni = SocioAuth.SoloDigitos(datos.Dni);
+
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            socio = await db.Socios
+            // El DNI se guarda con la letra; comparamos por los dígitos ya en SQL para poder
+            // usar el índice en vez de traer todos los socios y filtrar en memoria.
+            var candidatos = await db.Socios
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.NumeroSocio == datos.NumeroSocio);
+                .Include(s => s.CategoriaSocio)
+                .Where(s => s.Dni != null && s.Dni.Contains(digitosDni))
+                .ToListAsync();
+
+            socio = candidatos.FirstOrDefault(s => SocioAuth.DniCoincide(s, datos.Dni));
         }
         catch (Exception ex)
         {
@@ -95,11 +103,11 @@
             return;
         }
 
-        // Un único mensaje para socio inexistente y teléfono incorrecto: así no se
-        // puede averiguar qué números de socio existen probando uno a uno.
-        if (socio is null || !SocioAuth.TelefonoCoincide(socio, datos.Telefono))
+        // Un único mensaje para socio inexistente y PIN incorrecto: así no se puede averiguar
+        // qué DNI están dados de alta probando uno a uno.
+        if (socio is null || !SocioAuth.PinCoincide(socio, datos.Pin))
         {
-            mensajeError = "Número de socio o teléfono incorrectos.";
+            mensajeError = "DNI o PIN incorrectos.";
             return;
         }
 
@@ -129,11 +137,10 @@
 
     private sealed class DatosAcceso
     {
-        [Required(ErrorMessage = "Indica tu número de socio.")]
-        [Range(1, int.MaxValue, ErrorMessage = "El número de socio debe ser positivo.")]
-        public int? NumeroSocio { get; set; }
+        [Required(ErrorMessage = "Indica tu DNI.")]
+        public string? Dni { get; set; }
 
-        [Required(ErrorMessage = "Indica tu teléfono.")]
-        public string? Telefono { get; set; }
+        [Required(ErrorMessage = "Indica tu PIN.")]
+        public long? Pin { get; set; }
     }
 }

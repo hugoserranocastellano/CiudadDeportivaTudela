@@ -5,6 +5,7 @@
 @inject IConfiguration Configuration
 
 <PageTitle>Socios</PageTitle>
+<JuntaGuard />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Socios</h1>
@@ -28,16 +29,13 @@
 {
     <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
         <DataAnnotationsValidator />
-        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo socio" : $"Editar socio nº {edicion.NumeroSocio}")</div>
+        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo socio" : $"Editar socio: {edicion.Nombre}")</div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Nº socio</label>
-                    <InputNumber class="form-control" @bind-Value="edicion.NumeroSocio" />
-                </div>
-                <div class="col-md-3">
                     <label class="form-label">DNI</label>
                     <InputText class="form-control" @bind-Value="edicion.Dni" />
+                    <div class="form-text">Es también su usuario de acceso (sin la letra).</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Nombre</label>
@@ -50,7 +48,6 @@
                 <div class="col-md-3">
                     <label class="form-label">Teléfono</label>
                     <InputText class="form-control" @bind-Value="edicion.Telefono" />
-                    <div class="form-text">Es también su contraseña de acceso.</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Email</label>
@@ -58,11 +55,18 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Categoría</label>
-                    <InputText class="form-control" @bind-Value="edicion.Categoria" />
+                    <InputSelect class="form-select" @bind-Value="edicion.CategoriaId">
+                        <option value="">(sin categoría)</option>
+                        @foreach (var c in categorias)
+                        {
+                            <option value="@c.Id">@c.TipoSocio (junta: @c.Junta)</option>
+                        }
+                    </InputSelect>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Cargo</label>
-                    <InputText class="form-control" @bind-Value="edicion.Cargo" />
+                    <label class="form-label">PIN</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.PinHash" />
+                    <div class="form-text">Es su contraseña de acceso.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Nº de cuenta</label>
@@ -113,11 +117,10 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>Nº</th>
+                    <th>DNI</th>
                     <th>Nombre</th>
                     <th>Apellidos</th>
                     <th>Categoría</th>
-                    <th>Cargo</th>
                     <th>Teléfono</th>
                     <th>Email</th>
                     <th>Alta</th>
@@ -129,11 +132,10 @@ else
                 @foreach (var socio in Filtrados)
                 {
                     <tr>
-                        <td>@socio.NumeroSocio</td>
+                        <td>@socio.Dni</td>
                         <td>@socio.Nombre</td>
                         <td>@socio.Apellidos</td>
-                        <td>@socio.Categoria</td>
-                        <td>@socio.Cargo</td>
+                        <td>@(socio.CategoriaSocio?.TipoSocio)</td>
                         <td>@socio.Telefono</td>
                         <td>@socio.Email</td>
                         <td>@socio.FechaAlta?.ToShortDateString()</td>
@@ -159,6 +161,7 @@ else
 
 @code {
     private List<Socio>? socios;
+    private List<CategoriaSocio> categorias = new();
     private Socio? edicion;
     private bool esNuevo;
     private bool activo = true;
@@ -184,7 +187,7 @@ else
             var texto = filtro.Trim();
 
             return socios.Where(s =>
-                s.NumeroSocio.ToString().Contains(texto, StringComparison.OrdinalIgnoreCase)
+                (s.Dni?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
                 || s.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
                 || (s.Apellidos?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (s.Telefono?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false))
@@ -202,8 +205,11 @@ else
 
             socios = await db.Socios
                 .AsNoTracking()
-                .OrderBy(s => s.NumeroSocio)
+                .Include(s => s.CategoriaSocio)
+                .OrderBy(s => s.Nombre)
                 .ToListAsync();
+
+            categorias = await db.CategoriasSocios.AsNoTracking().ToListAsync();
 
             error = null;
             diagnostico = null;
@@ -220,7 +226,6 @@ else
     {
         edicion = new Socio
         {
-            NumeroSocio = (socios?.Count > 0 ? socios.Max(s => s.NumeroSocio) : 0) + 1,
             FechaAlta = DateTime.Today,
         };
         activo = true;
@@ -234,7 +239,6 @@ else
         edicion = new Socio
         {
             Id = socio.Id,
-            NumeroSocio = socio.NumeroSocio,
             Dni = socio.Dni,
             Nombre = socio.Nombre,
             Apellidos = socio.Apellidos,
@@ -242,9 +246,7 @@ else
             Email = socio.Email,
             UrlFoto = socio.UrlFoto,
             PinHash = socio.PinHash,
-            PatronHash = socio.PatronHash,
-            Categoria = socio.Categoria,
-            Cargo = socio.Cargo,
+            CategoriaId = socio.CategoriaId,
             NumeroCuenta = socio.NumeroCuenta,
             Activo = socio.Activo,
             FechaAlta = socio.FechaAlta,

@@ -1,0 +1,22 @@
+@* Páginas de administración: sólo los socios de junta (CategoriaSocio.Junta = "SI") pueden
+   entrar. Un socio normal que teclee la URL a mano es devuelto a Inicio. *@
+@inject NavigationManager Navigation
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        if (!SocioAuth.EsJunta(estado.User))
+        {
+            Navigation.NavigateTo("/inicio", forceLoad: true);
+        }
+    }
+}

@@ -34,6 +34,10 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Sugerencia> Sugerencias => Set<Sugerencia>();
 
+    public DbSet<CategoriaSocio> CategoriasSocios => Set<CategoriaSocio>();
+
+    public DbSet<Evento> Eventos => Set<Evento>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Socio>(entity =>
@@ -42,7 +46,6 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.NumeroSocio).HasColumnName("numero_socio");
             entity.Property(e => e.Dni).HasColumnName("dni");
             entity.Property(e => e.Nombre).HasColumnName("nombre");
             entity.Property(e => e.Apellidos).HasColumnName("apellidos");
@@ -50,14 +53,14 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Email).HasColumnName("email");
             entity.Property(e => e.UrlFoto).HasColumnName("url_foto");
             entity.Property(e => e.PinHash).HasColumnName("pin_hash");
-            entity.Property(e => e.PatronHash).HasColumnName("patron_hash");
-            entity.Property(e => e.Categoria).HasColumnName("categoria");
-            entity.Property(e => e.Cargo).HasColumnName("cargo");
+            entity.Property(e => e.CategoriaId).HasColumnName("categoria");
             entity.Property(e => e.NumeroCuenta).HasColumnName("numero_cuenta");
             entity.Property(e => e.Activo).HasColumnName("activo");
             entity.Property(e => e.FechaAlta).HasColumnName("fecha_alta");
 
-            entity.HasIndex(e => e.NumeroSocio).IsUnique();
+            entity.HasOne(e => e.CategoriaSocio)
+                .WithMany()
+                .HasForeignKey(e => e.CategoriaId);
         });
 
         modelBuilder.Entity<Articulo>(entity =>
@@ -249,5 +252,26 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.SocioId);
         });
+
+        modelBuilder.Entity<CategoriaSocio>(entity =>
+        {
+            entity.ToTable("CategoriasSocios");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_Categoria");
+            entity.Property(e => e.Junta).HasColumnName("JUNTA").IsRequired();
+            entity.Property(e => e.TipoSocio).HasColumnName("TIPO_SOCIO");
+        });
+
+        modelBuilder.Entity<Evento>(entity =>
+        {
+            entity.ToTable("eventos");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Descripcion).HasColumnName("descripcion").IsRequired();
+            entity.Property(e => e.Fecha).HasColumnName("fecha");
+        });
+
     }
 }

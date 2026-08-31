@@ -5,17 +5,21 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 namespace CiudadDeportivaTudela.Services;
 
 /// <summary>
-/// Identificación del socio: usuario = número de socio, contraseña = teléfono.
+/// Identificación del socio: usuario = DNI sin letra, contraseña = PIN numérico (columna pin_hash).
 /// </summary>
 public static class SocioAuth
 {
     public const string Scheme = CookieAuthenticationDefaults.AuthenticationScheme;
 
-    public const string ClaimNumeroSocio = "numero_socio";
+    public const string ClaimDni = "dni";
+
+    // "SI" si el socio pertenece a la junta directiva (CategoriaSocio.Junta); determina qué ve y
+    // qué puede hacer en la app. Los que no son de junta (JUNTA=NO, categoría 7) van capados.
+    public const string ClaimJunta = "junta";
 
     /// <summary>
-    /// Los teléfonos se teclean con espacios, guiones o prefijo (+34 948 ...), así que
-    /// se comparan sólo los dígitos y, si hay prefijo, los 9 últimos.
+    /// El DNI se teclea con o sin la letra y a veces con espacios o guiones; sólo se compara la
+    /// parte numérica.
     /// </summary>
     public static string SoloDigitos(string? valor)
     {
@@ -24,17 +28,29 @@ public static class SocioAuth
             return string.Empty;
         }
 
-        var digitos = new string(valor.Where(char.IsDigit).ToArray());
-
-        return digitos.Length > 9 ? digitos[^9..] : digitos;
+        return new string(valor.Where(char.IsDigit).ToArray());
     }
 
-    public static bool TelefonoCoincide(Socio socio, string? telefonoTecleado)
+    public static bool DniCoincide(Socio socio, string? dniTecleado)
     {
-        var esperado = SoloDigitos(socio.Telefono);
-        var recibido = SoloDigitos(telefonoTecleado);
+        var esperado = SoloDigitos(socio.Dni);
+        var recibido = SoloDigitos(dniTecleado);
 
         return esperado.Length > 0 && esperado == recibido;
+    }
+
+    public static bool PinCoincide(Socio socio, long? pinTecleado)
+    {
+        return socio.PinHash.HasValue && pinTecleado.HasValue && socio.PinHash == pinTecleado;
+    }
+
+    public static bool EsJunta(ClaimsPrincipal usuario) =>
+        string.Equals(usuario.FindFirst(ClaimJunta)?.Value, "SI", StringComparison.OrdinalIgnoreCase);
+
+    public static long? SocioId(ClaimsPrincipal usuario)
+    {
+        var valor = usuario.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return long.TryParse(valor, out var id) ? id : null;
     }
 
     public static ClaimsPrincipal CrearPrincipal(Socio socio)
@@ -45,17 +61,10 @@ public static class SocioAuth
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, socio.Id.ToString()),
-            new(ClaimTypes.Name, string.IsNullOrWhiteSpace(nombreCompleto)
-                ? $"Socio {socio.NumeroSocio}"
-                : nombreCompleto),
-            new(ClaimNumeroSocio, socio.NumeroSocio.ToString()),
-            new(ClaimTypes.Role, string.IsNullOrWhiteSpace(socio.Categoria) ? "socio" : socio.Categoria),
+            new(ClaimTypes.Name, string.IsNullOrWhiteSpace(nombreCompleto) ? $"Socio {socio.Id}" : nombreCompleto),
+            new(ClaimDni, socio.Dni ?? string.Empty),
+            new(ClaimJunta, socio.CategoriaSocio?.Junta ?? "NO"),
         };
-
-        if (!string.IsNullOrWhiteSpace(socio.Cargo))
-        {
-            claims.Add(new Claim("cargo", socio.Cargo));
-        }
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme));
     }

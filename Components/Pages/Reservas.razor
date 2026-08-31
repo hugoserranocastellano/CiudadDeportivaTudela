@@ -4,6 +4,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Reservas</PageTitle>
+<JuntaGuard />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Reservas</h1>
@@ -157,10 +158,10 @@ else
 
             socios = (await db.Socios
                     .AsNoTracking()
-                    .OrderBy(s => s.NumeroSocio)
-                    .Select(s => new { s.Id, s.NumeroSocio, s.Nombre, s.Apellidos })
+                    .OrderBy(s => s.Nombre)
+                    .Select(s => new { s.Id, s.Dni, s.Nombre, s.Apellidos })
                     .ToListAsync())
-                .Select(s => new Opcion(s.Id, $"{s.NumeroSocio} · {s.Nombre} {s.Apellidos}".TrimEnd()))
+                .Select(s => new Opcion(s.Id, $"{s.Dni} · {s.Nombre} {s.Apellidos}".TrimEnd()))
                 .ToList();
 
             nombresSocio = socios.ToDictionary(s => s.Id, s => s.Texto);

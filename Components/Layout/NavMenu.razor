@@ -1,3 +1,5 @@
+@inject NavigationManager Navigation
+
 <div class="brand-row">
     <a class="brand" href="inicio">
         <img src="images/pena_ciudad-deportiva.jpg" alt="Peña Ciudad Deportiva" class="brand-logo" />
@@ -16,84 +18,105 @@
             </NavLink>
         </div>
 
-        <div class="nav-seccion">Socios</div>
+        @if (esJunta)
+        {
+            <div class="nav-seccion">Socios</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="socios">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Socios
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="socios">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Socios
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="sugerencias">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Sugerencias
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="sugerencias">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Sugerencias
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="evento-inscripciones">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Inscripciones a eventos
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="evento-inscripciones">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Inscripciones a eventos
+                </NavLink>
+            </div>
 
-        <div class="nav-seccion">Bar y almacén</div>
+            <div class="nav-seccion">Bar y almacén</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="articulos">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Artículos
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="articulos">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Artículos
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="tickets">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Tickets
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="tickets">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Tickets
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="ticket-lineas">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Líneas de ticket
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="ticket-lineas">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Líneas de ticket
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="movimientos-stock">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Movimientos de stock
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="movimientos-stock">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Movimientos de stock
+                </NavLink>
+            </div>
 
-        <div class="nav-seccion">Comedor</div>
+            <div class="nav-seccion">Comedor</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="mesas">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Mesas
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="mesas">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Mesas
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="reservas">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reservas
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="reservas">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reservas
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="reserva-mesas">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Mesas por reserva
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="reserva-mesas">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Mesas por reserva
+                </NavLink>
+            </div>
 
-        <div class="nav-seccion">Cuentas</div>
+            <div class="nav-seccion">Cuentas</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="categorias-gasto">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Categorías de gasto
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="categorias-gasto">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Categorías de gasto
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="gastos-sociedad">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Gastos de la sociedad
-            </NavLink>
-        </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="gastos-sociedad">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Gastos de la sociedad
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private bool esJunta;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        esJunta = SocioAuth.EsJunta(estado.User);
+    }
+}

@@ -4,8 +4,7 @@ public class Socio
 {
     public long Id { get; set; }
 
-    public int NumeroSocio { get; set; }
-
+    // Se guarda con la letra; el acceso sólo compara los dígitos (ver SocioAuth.SoloDigitos).
     public string? Dni { get; set; }
 
     public string Nombre { get; set; } = string.Empty;
@@ -18,13 +17,12 @@ public class Socio
 
     public string? UrlFoto { get; set; }
 
-    public string PinHash { get; set; } = string.Empty;
+    // Contraseña de acceso: un PIN numérico, no un hash criptográfico pese al nombre de columna.
+    public long? PinHash { get; set; }
 
-    public string? PatronHash { get; set; }
+    public long? CategoriaId { get; set; }
 
-    public string Categoria { get; set; } = "socio";
-
-    public string? Cargo { get; set; }
+    public CategoriaSocio? CategoriaSocio { get; set; }
 
     public string? NumeroCuenta { get; set; }
 
