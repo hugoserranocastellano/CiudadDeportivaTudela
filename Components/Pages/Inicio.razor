@@ -42,16 +42,31 @@ else
                         <InputText class="form-control" @bind-Value="datosEdicion!.Apellidos" />
                     </div>
                     <div class="col-md-4">
+                        <label class="form-label">Dirección</label>
+                        <InputText class="form-control" @bind-Value="datosEdicion!.Direccion" />
+                    </div>
+                    <div class="col-md-4">
                         <label class="form-label">Teléfono</label>
                         <InputText class="form-control" @bind-Value="datosEdicion!.Telefono" />
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">Email</label>
                         <InputText class="form-control" @bind-Value="datosEdicion!.Email" />
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label">URL de la foto</label>
                         <InputText class="form-control" @bind-Value="datosEdicion!.UrlFoto" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Cuenta bancaria</label>
+                        <div class="input-group">
+                            <input class="form-control" readonly
+                                   value="@(mostrarCuenta ? (string.IsNullOrWhiteSpace(socio.NumeroCuenta) ? "(sin registrar)" : socio.NumeroCuenta) : Ocultar(socio.NumeroCuenta))" />
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => mostrarCuenta = !mostrarCuenta">
+                                @(mostrarCuenta ? "Ocultar" : "Ver")
+                            </button>
+                        </div>
+                        <div class="form-text">Sólo lectura. Para cambiarla, contacta con la junta.</div>
                     </div>
                 </div>
                 <ValidationSummary class="mt-3 small" />
@@ -62,20 +77,6 @@ else
             </div>
         </EditForm>
     }
-
-    <div class="card mb-4">
-        <div class="card-body d-flex flex-wrap align-items-center gap-3">
-            <div>
-                <div class="text-muted small">Cuenta bancaria</div>
-                <div class="fs-5">
-                    @(mostrarCuenta ? (string.IsNullOrWhiteSpace(socio.NumeroCuenta) ? "(sin registrar)" : socio.NumeroCuenta) : Ocultar(socio.NumeroCuenta))
-                </div>
-            </div>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => mostrarCuenta = !mostrarCuenta">
-                @(mostrarCuenta ? "Ocultar" : "Ver")
-            </button>
-        </div>
-    </div>
 
     <div class="d-flex flex-wrap gap-2 mb-4">
         <button class="btn btn-pena" @onclick="AbrirNuevoTicket">Nuevo ticket</button>
@@ -284,6 +285,7 @@ else
         {
             Nombre = socio.Nombre,
             Apellidos = socio.Apellidos,
+            Direccion = socio.Direccion,
             Telefono = socio.Telefono,
             Email = socio.Email,
             UrlFoto = socio.UrlFoto,
@@ -306,6 +308,7 @@ else
             await db.Socios.Where(s => s.Id == socioId).ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.Nombre, datosEdicion.Nombre)
                 .SetProperty(x => x.Apellidos, datosEdicion.Apellidos)
+                .SetProperty(x => x.Direccion, datosEdicion.Direccion)
                 .SetProperty(x => x.Telefono, datosEdicion.Telefono)
                 .SetProperty(x => x.Email, datosEdicion.Email)
                 .SetProperty(x => x.UrlFoto, datosEdicion.UrlFoto));
@@ -461,6 +464,8 @@ else
         public string Nombre { get; set; } = string.Empty;
 
         public string? Apellidos { get; set; }
+
+        public string? Direccion { get; set; }
 
         public string? Telefono { get; set; }
 

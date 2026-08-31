@@ -48,10 +48,15 @@
                 <div class="col-md-3">
                     <label class="form-label">Teléfono</label>
                     <InputText class="form-control" @bind-Value="edicion.Telefono" />
+                    <div class="form-text">Es también su usuario de acceso (PIN = sus 4 últimos dígitos).</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Email</label>
                     <InputText class="form-control" @bind-Value="edicion.Email" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Dirección</label>
+                    <InputText class="form-control" @bind-Value="edicion.Direccion" />
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Categoría</label>
@@ -62,11 +67,6 @@
                             <option value="@c.Id">@c.TipoSocio (junta: @c.Junta)</option>
                         }
                     </InputSelect>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">PIN</label>
-                    <InputNumber class="form-control" @bind-Value="edicion.PinHash" />
-                    <div class="form-text">Es su contraseña de acceso.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Nº de cuenta</label>
@@ -97,7 +97,7 @@
 }
 
 <div class="mb-3" style="max-width: 22rem;">
-    <input class="form-control" placeholder="Buscar por nombre, nº o teléfono"
+    <input class="form-control" placeholder="Buscar por DNI, nombre, apellidos, teléfono, email o dirección"
            value="@filtro" @oninput="e => filtro = e.Value?.ToString() ?? string.Empty" />
 </div>
 
@@ -117,14 +117,15 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>DNI</th>
-                    <th>Nombre</th>
-                    <th>Apellidos</th>
-                    <th>Categoría</th>
-                    <th>Teléfono</th>
-                    <th>Email</th>
-                    <th>Alta</th>
-                    <th>Activo</th>
+                    <th role="button" @onclick='() => Ordenar("dni")'>DNI@Flecha("dni")</th>
+                    <th role="button" @onclick='() => Ordenar("nombre")'>Nombre@Flecha("nombre")</th>
+                    <th role="button" @onclick='() => Ordenar("apellidos")'>Apellidos@Flecha("apellidos")</th>
+                    <th role="button" @onclick='() => Ordenar("direccion")'>Dirección@Flecha("direccion")</th>
+                    <th role="button" @onclick='() => Ordenar("categoria")'>Categoría@Flecha("categoria")</th>
+                    <th role="button" @onclick='() => Ordenar("telefono")'>Teléfono@Flecha("telefono")</th>
+                    <th role="button" @onclick='() => Ordenar("email")'>Email@Flecha("email")</th>
+                    <th role="button" @onclick='() => Ordenar("alta")'>Alta@Flecha("alta")</th>
+                    <th role="button" @onclick='() => Ordenar("activo")'>Activo@Flecha("activo")</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
@@ -135,6 +136,7 @@ else
                         <td>@socio.Dni</td>
                         <td>@socio.Nombre</td>
                         <td>@socio.Apellidos</td>
+                        <td>@socio.Direccion</td>
                         <td>@(socio.CategoriaSocio?.TipoSocio)</td>
                         <td>@socio.Telefono</td>
                         <td>@socio.Email</td>
@@ -170,6 +172,9 @@ else
     private string? error;
     private string? diagnostico;
 
+    private string ordenCampo = "nombre";
+    private bool ordenDescendente;
+
     private List<Socio> Filtrados
     {
         get
@@ -179,21 +184,57 @@ else
                 return new List<Socio>();
             }
 
-            if (string.IsNullOrWhiteSpace(filtro))
+            IEnumerable<Socio> resultado = socios;
+
+            if (!string.IsNullOrWhiteSpace(filtro))
             {
-                return socios;
+                var texto = filtro.Trim();
+
+                resultado = resultado.Where(s =>
+                    (s.Dni?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || s.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
+                    || (s.Apellidos?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (s.Direccion?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (s.Telefono?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || (s.Email?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false));
             }
 
-            var texto = filtro.Trim();
+            Func<Socio, object?> clave = ordenCampo switch
+            {
+                "dni" => s => s.Dni,
+                "apellidos" => s => s.Apellidos,
+                "direccion" => s => s.Direccion,
+                "categoria" => s => s.CategoriaSocio?.TipoSocio,
+                "telefono" => s => s.Telefono,
+                "email" => s => s.Email,
+                "alta" => s => s.FechaAlta,
+                "activo" => s => s.Activo,
+                _ => s => s.Nombre,
+            };
 
-            return socios.Where(s =>
-                (s.Dni?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
-                || s.Nombre.Contains(texto, StringComparison.OrdinalIgnoreCase)
-                || (s.Apellidos?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false)
-                || (s.Telefono?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false))
-                .ToList();
+            resultado = ordenDescendente
+                ? resultado.OrderByDescending(clave)
+                : resultado.OrderBy(clave);
+
+            return resultado.ToList();
         }
     }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override Task OnInitializedAsync() => Cargar();
 
@@ -242,6 +283,7 @@ else
             Dni = socio.Dni,
             Nombre = socio.Nombre,
             Apellidos = socio.Apellidos,
+            Direccion = socio.Direccion,
             Telefono = socio.Telefono,
             Email = socio.Email,
             UrlFoto = socio.UrlFoto,

@@ -57,6 +57,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.NumeroCuenta).HasColumnName("numero_cuenta");
             entity.Property(e => e.Activo).HasColumnName("activo");
             entity.Property(e => e.FechaAlta).HasColumnName("fecha_alta");
+            entity.Property(e => e.Direccion).HasColumnName("direccion");
 
             entity.HasOne(e => e.CategoriaSocio)
                 .WithMany()

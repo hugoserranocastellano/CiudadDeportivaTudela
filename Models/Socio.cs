@@ -17,7 +17,7 @@ public class Socio
 
     public string? UrlFoto { get; set; }
 
-    // Contraseña de acceso: un PIN numérico, no un hash criptográfico pese al nombre de columna.
+    // Columna heredada, ya sin uso en el acceso (ver SocioAuth: usuario = teléfono, PIN = últimos 4 dígitos).
     public long? PinHash { get; set; }
 
     public long? CategoriaId { get; set; }
@@ -29,4 +29,6 @@ public class Socio
     public bool? Activo { get; set; }
 
     public DateTime? FechaAlta { get; set; }
+
+    public string? Direccion { get; set; }
 }
