@@ -34,14 +34,13 @@ else
             <div class="d-flex flex-wrap gap-2">
                 <input class="form-control" style="max-width: 320px;" list="listaArticulos"
                        placeholder="Escribe o elige un producto (ej. cer)"
-                       @bind="filtro" @bind:event="oninput" />
+                       @bind="filtro" @bind:event="oninput" @bind:after="IntentarAnadirPorTexto" />
                 <datalist id="listaArticulos">
                     @foreach (var a in articulos)
                     {
                         <option value="@Etiqueta(a)"></option>
                     }
                 </datalist>
-                <button type="button" class="btn btn-pena" @onclick="AnadirProducto">+</button>
             </div>
         </div>
     </div>
@@ -148,7 +147,7 @@ else
         }
     }
 
-    private void AnadirProducto()
+    private void IntentarAnadirPorTexto()
     {
         if (string.IsNullOrWhiteSpace(filtro))
         {
@@ -157,23 +156,12 @@ else
 
         var texto = filtro.Trim();
 
+        // El navegador rellena el input con el texto exacto de la opción del datalist
+        // al elegirla, así que una coincidencia exacta significa que el socio ha seleccionado
+        // el producto (y no que simplemente está escribiendo para filtrar).
         var articulo = articulos.FirstOrDefault(a => Etiqueta(a).Equals(texto, StringComparison.OrdinalIgnoreCase));
-
         if (articulo is null)
         {
-            var candidatos = articulos
-                .Where(a => a.Descripcion.Contains(texto, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            if (candidatos.Count == 1)
-            {
-                articulo = candidatos[0];
-            }
-        }
-
-        if (articulo is null)
-        {
-            error = "Selecciona un producto de la lista.";
             return;
         }
 
@@ -225,7 +213,7 @@ else
 
             var ticket = new Ticket
             {
-                Fecha = DateTime.SpecifyKind(fecha, DateTimeKind.Unspecified),
+                Fecha = fecha.ToUniversalTime(),
                 SocioId = socioId,
                 ImporteTotal = Total,
                 Revisado = false,
@@ -249,7 +237,7 @@ else
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ex.InnerException?.Message ?? ex.Message;
         }
     }
 
