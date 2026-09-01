@@ -24,6 +24,12 @@ a, .btn-link {
     border-color: var(--pena-rojo-oscuro);
 }
 
+/* Mismo ancho para los botones de acción/historial de Inicio, sin importar
+   la longitud del texto (p.ej. "Nuevo ticket" vs "Historial"). */
+.btn-accion {
+    min-width: 9rem;
+}
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(200, 16, 46, 0.45);
 }

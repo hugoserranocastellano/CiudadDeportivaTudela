@@ -33,7 +33,7 @@
     }
     else
     {
-        <InputFile class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@Disabled" />
+        <InputFile @ref="inputFile" class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@Disabled" />
     }
 
     @if (error is not null)
@@ -59,6 +59,7 @@
     public EventCallback<string> FotoSubida { get; set; }
 
     private readonly string canvasId = $"fotoCropper-{Guid.NewGuid():N}";
+    private InputFile? inputFile;
     private IJSObjectReference? modulo;
     private bool recortando;
     private bool subiendo;
@@ -75,16 +76,13 @@
     {
         error = null;
 
+        if (inputFile?.Element is null)
+        {
+            return;
+        }
+
         try
         {
-            var archivo = e.File;
-            using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
-            using var memoria = new MemoryStream();
-            await stream.CopyToAsync(memoria);
-
-            var base64 = Convert.ToBase64String(memoria.ToArray());
-            var dataUrl = $"data:{archivo.ContentType};base64,{base64}";
-
             recortando = true;
             StateHasChanged();
             // El canvas todavía no existe en el DOM hasta que Blazor renderiza
@@ -92,7 +90,11 @@
             await Task.Yield();
 
             var js = await ModuloAsync();
-            await js.InvokeVoidAsync("cargar", canvasId, dataUrl);
+            // La foto se lee directamente en el navegador (FileReader sobre el
+            // <input>), sin mandar los bytes originales por el circuito de
+            // Blazor Server: una foto de varios MB como argumento de interop es
+            // lenta y puede acabar en "A task was cancelled" por timeout.
+            await js.InvokeVoidAsync("cargarDesdeInput", canvasId, inputFile.Element.Value, 5 * 1024 * 1024);
             cargado = true;
         }
         catch (Exception ex)

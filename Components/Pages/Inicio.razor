@@ -84,28 +84,28 @@ else
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="fw-semibold">Tickets</span>
             <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-sm btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-tickets"))">Historial</button>
+                <button class="btn btn-sm btn-pena btn-accion" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
+                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-tickets"))">Historial</button>
             </div>
         </div>
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="fw-semibold">Reservas</span>
             <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
+                <button class="btn btn-sm btn-pena btn-accion" @onclick="AbrirNuevaReserva">Nueva reserva</button>
+                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
             </div>
         </div>
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="fw-semibold">Sugerencias</span>
             <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
+                <button class="btn btn-sm btn-pena btn-accion" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
+                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
             </div>
         </div>
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="fw-semibold">Eventos</span>
             <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-eventos"))">Historial</button>
+                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-eventos"))">Historial</button>
             </div>
         </div>
     </div>

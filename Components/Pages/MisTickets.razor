@@ -5,6 +5,8 @@
 
 <PageTitle>Mis tickets</PageTitle>
 
+<a class="btn btn-outline-secondary btn-sm mb-3" href="inicio">← Volver</a>
+
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Mis tickets</h1>
     <a class="btn btn-pena" href="tickets/nuevo">Nuevo ticket</a>
@@ -40,7 +42,8 @@ else
             <tbody>
                 @foreach (var ticket in tickets)
                 {
-                    <tr role="button" class="@(ticketSeleccionado == ticket.Id ? "table-active" : null)"
+                    <tr role="button" class="@(ticketSeleccionado == ticket.Id ? "table-primary fw-semibold" : null)"
+                        style="@(ticketSeleccionado == ticket.Id ? "border-left: 4px solid var(--bs-primary);" : null)"
                         @onclick="() => Seleccionar(ticket.Id)">
                         <td>@ticket.Id</td>
                         <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
@@ -57,7 +60,7 @@ else
                     @if (ticketSeleccionado == ticket.Id)
                     {
                         <tr>
-                            <td colspan="6" class="bg-light">
+                            <td colspan="6" class="table-primary bg-opacity-25" style="border-left: 4px solid var(--bs-primary);">
                                 @if (lineasCargando)
                                 {
                                     <p class="mb-0"><em>Cargando detalle...</em></p>

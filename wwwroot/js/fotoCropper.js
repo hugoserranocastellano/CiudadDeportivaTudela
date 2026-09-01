@@ -134,6 +134,27 @@ function enganchar(estado) {
     estado.listeners = { onPointerDown, onPointerMove, onPointerUp, onWheel };
 }
 
+// Lee el fichero directamente del <input> en el navegador (sin pasar por
+// Blazor Server): mandar una foto de varios MB como argumento de interop por
+// el circuito SignalR es lento y puede superar su timeout/tamaño máximo de
+// mensaje, lo que se ve como "A task was cancelled" en el cliente.
+export function cargarDesdeInput(canvasId, inputElement, maxBytes) {
+    const file = inputElement && inputElement.files && inputElement.files[0];
+    if (!file) {
+        return Promise.reject(new Error('No se ha seleccionado ningún fichero.'));
+    }
+    if (maxBytes && file.size > maxBytes) {
+        return Promise.reject(new Error('La foto pesa demasiado (máximo 5 MB).'));
+    }
+
+    return new Promise((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => cargar(canvasId, lector.result).then(resolve).catch(reject);
+        lector.onerror = () => reject(new Error('No se pudo leer el fichero.'));
+        lector.readAsDataURL(file);
+    });
+}
+
 export function cargar(canvasId, dataUrl) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) {
