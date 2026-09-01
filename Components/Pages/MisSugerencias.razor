@@ -1,0 +1,106 @@
+@page "/mis-sugerencias"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Mis sugerencias</PageTitle>
+
+<h1 class="mb-3">Mis sugerencias</h1>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (sugerencias is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (sugerencias.Count == 0)
+{
+    <p><em>No has enviado sugerencias.</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Sugerencia</th>
+                    <th>Respuesta de la junta</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var sugerencia in sugerencias)
+                {
+                    <tr class="@(string.IsNullOrWhiteSpace(sugerencia.Respuesta) ? "table-warning" : null)">
+                        <td>@sugerencia.Id</td>
+                        <td>@sugerencia.Fecha?.ToString("dd/MM/yyyy")</td>
+                        <td>@sugerencia.Descripcion</td>
+                        <td>
+                            @sugerencia.Respuesta
+                            @if (sugerencia.FechaRespuesta is not null)
+                            {
+                                <div class="text-muted small">@sugerencia.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private List<Fila>? sugerencias;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            sugerencias = await db.Sugerencias
+                .AsNoTracking()
+                .Where(s => s.SocioId == socioId)
+                .OrderByDescending(s => s.Fecha)
+                .ThenByDescending(s => s.Id)
+                .Select(s => new Fila(s.Id, s.Fecha, s.Descripcion, s.Respuesta, s.FechaRespuesta))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            sugerencias ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private record Fila(long Id, DateTime? Fecha, string Descripcion, string? Respuesta, DateTime? FechaRespuesta);
+}

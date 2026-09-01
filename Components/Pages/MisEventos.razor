@@ -1,0 +1,107 @@
+@page "/mis-eventos"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Mis eventos</PageTitle>
+
+<h1 class="mb-3">Mis eventos</h1>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (inscripciones is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (inscripciones.Count == 0)
+{
+    <p><em>No estás inscrito en ningún evento.</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Evento</th>
+                    <th>Fecha</th>
+                    <th>Acude</th>
+                    <th>Lista de espera</th>
+                    <th>Inscripción</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var inscripcion in inscripciones)
+                {
+                    <tr class="@(inscripcion.ListaEspera == true ? "table-warning" : null)">
+                        <td>@DescripcionEvento(inscripcion.EventoId)</td>
+                        <td>@FechaEvento(inscripcion.EventoId)?.ToString("dd/MM/yyyy")</td>
+                        <td>@(inscripcion.Acude == true ? "Sí" : "No")</td>
+                        <td>@(inscripcion.ListaEspera == true ? "Sí" : "No")</td>
+                        <td>@inscripcion.FechaInscripcion?.ToString("dd/MM/yyyy HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private List<EventoInscripcion>? inscripciones;
+    private Dictionary<long, Evento> eventos = new();
+    private string? error;
+
+    private string DescripcionEvento(long? id) =>
+        id is not null && eventos.TryGetValue(id.Value, out var evento) ? evento.Descripcion : "—";
+
+    private DateTime? FechaEvento(long? id) =>
+        id is not null && eventos.TryGetValue(id.Value, out var evento) ? evento.Fecha : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            eventos = await db.Eventos.AsNoTracking().ToDictionaryAsync(e => e.Id);
+
+            inscripciones = await db.EventoInscripciones
+                .AsNoTracking()
+                .Where(i => i.SocioId == socioId)
+                .OrderByDescending(i => i.FechaInscripcion)
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            inscripciones ??= new List<EventoInscripcion>();
+            error = ex.Message;
+        }
+    }
+}

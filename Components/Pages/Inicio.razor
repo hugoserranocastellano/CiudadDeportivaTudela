@@ -60,7 +60,7 @@ else
                         @if (!string.IsNullOrWhiteSpace(datosEdicion!.UrlFoto))
                         {
                             <div class="mb-2">
-                                <img src="@datosEdicion.UrlFoto" alt="Foto de @socio.Nombre" style="max-height:100px" class="rounded" />
+                                <img src="@datosEdicion.UrlFoto" alt="Foto de @socio.Nombre" style="max-height:220px" class="rounded" />
                             </div>
                         }
                         <InputFile class="form-control" OnChange="SubirFoto" accept="image/*" disabled="@subiendoFoto" />
@@ -90,10 +90,50 @@ else
         </EditForm>
     }
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <button class="btn btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
-        <button class="btn btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
-        <button class="btn btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
+    <div class="row row-cols-1 row-cols-md-4 g-3 mb-4">
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Tickets</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-tickets"))">Historial</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Reservas</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Sugerencias</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Eventos</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-eventos"))">Historial</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     @if (accion == Accion.Reserva)

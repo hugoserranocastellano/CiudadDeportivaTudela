@@ -1,0 +1,170 @@
+@page "/mis-reservas"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Mis reservas</PageTitle>
+
+<h1 class="mb-3">Mis reservas</h1>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+@if (mensaje is not null)
+{
+    <div class="alert alert-success py-2">@mensaje</div>
+}
+
+@if (reservas is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (reservas.Count == 0)
+{
+    <p><em>No tienes reservas registradas.</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th class="text-end">Comensales</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Limpieza</th>
+                    <th>Mesas</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var reserva in reservas)
+                {
+                    <tr>
+                        <td>@reserva.Id</td>
+                        <td>@reserva.Fecha.ToShortDateString()</td>
+                        <td class="text-end">@reserva.Comensales</td>
+                        <td>@reserva.TipoReserva</td>
+                        <td>@reserva.Estado</td>
+                        <td>@(reserva.Limpieza == true ? "Sí" : "No")</td>
+                        <td>@(reserva.Mesas.Count == 0 ? "—" : string.Join(", ", reserva.Mesas))</td>
+                        <td class="text-end text-nowrap">
+                            @if (string.Equals(reserva.Estado, "activa", StringComparison.OrdinalIgnoreCase))
+                            {
+                                @if (idCancelando == reserva.Id)
+                                {
+                                    <button class="btn btn-sm btn-danger" @onclick="() => Cancelar(reserva.Id)">Confirmar</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => idCancelando = null">No</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => idCancelando = reserva.Id">Cancelar</button>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private List<Fila>? reservas;
+    private long? idCancelando;
+    private string? error;
+    private string? mensaje;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            reservas = await db.Reservas
+                .AsNoTracking()
+                .Where(r => r.SocioId == socioId)
+                .OrderByDescending(r => r.Fecha)
+                .ThenByDescending(r => r.Id)
+                .Select(r => new Fila(
+                    r.Id,
+                    r.Fecha,
+                    r.Comensales,
+                    r.TipoReserva,
+                    r.Estado,
+                    r.Limpieza,
+                    r.ReservaMesas.Select(rm => rm.Mesa!.Descripcion).ToList()))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            reservas ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private async Task Cancelar(long id)
+    {
+        idCancelando = null;
+
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // El filtro por SocioId, además del Id, evita cancelar una reserva ajena
+            // aunque alguien manipule el id desde la consola del navegador.
+            var filas = await db.Reservas
+                .Where(r => r.Id == id && r.SocioId == socioId)
+                .ExecuteUpdateAsync(r => r.SetProperty(x => x.Estado, "cancelada"));
+
+            mensaje = filas > 0 ? "Reserva cancelada." : null;
+            error = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record Fila(
+        long Id,
+        DateOnly Fecha,
+        int? Comensales,
+        string? TipoReserva,
+        string? Estado,
+        bool? Limpieza,
+        List<string> Mesas);
+}

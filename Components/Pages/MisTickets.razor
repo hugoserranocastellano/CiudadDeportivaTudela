@@ -1,0 +1,124 @@
+@page "/mis-tickets"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Mis tickets</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Mis tickets</h1>
+    <a class="btn btn-pena" href="tickets/nuevo">Nuevo ticket</a>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (tickets is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (tickets.Count == 0)
+{
+    <p><em>No tienes tickets registrados.</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th class="text-end">Importe</th>
+                    <th>Revisado</th>
+                    <th>Líneas</th>
+                    <th>Foto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ticket in tickets)
+                {
+                    <tr>
+                        <td>@ticket.Id</td>
+                        <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
+                        <td class="text-end">@ticket.ImporteTotal?.ToString("0.00")€</td>
+                        <td>@(ticket.Revisado == true ? "Sí" : "No")</td>
+                        <td>@ticket.NumeroLineas</td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
+                            {
+                                <a href="@ticket.UrlFotoTicket" target="_blank" rel="noopener">Ver</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private List<Fila>? tickets;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            tickets = await db.Tickets
+                .AsNoTracking()
+                .Where(t => t.SocioId == socioId)
+                .OrderByDescending(t => t.Fecha)
+                .ThenByDescending(t => t.Id)
+                .Select(t => new Fila(
+                    t.Id,
+                    t.Fecha,
+                    t.ImporteTotal,
+                    t.Revisado,
+                    t.UrlFotoTicket,
+                    t.Lineas.Count))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            tickets ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private record Fila(
+        long Id,
+        DateTime? Fecha,
+        decimal? ImporteTotal,
+        bool? Revisado,
+        string? UrlFotoTicket,
+        int NumeroLineas);
+}
