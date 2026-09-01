@@ -16,7 +16,9 @@ public class Reserva
 
     public bool? Limpieza { get; set; } = false;
 
-    public string? TipoReserva { get; set; }
+    public long? TipoReservaId { get; set; }
+
+    public TipoReserva? TipoReserva { get; set; }
 
     public string? Estado { get; set; } = "activa";
 

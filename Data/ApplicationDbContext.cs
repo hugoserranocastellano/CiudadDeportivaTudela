@@ -22,6 +22,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Reserva> Reservas => Set<Reserva>();
 
+    public DbSet<TipoReserva> TiposReserva => Set<TipoReserva>();
+
     public DbSet<ReservaMesa> ReservaMesas => Set<ReservaMesa>();
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
@@ -129,7 +131,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.SocioId).HasColumnName("socio_id");
             entity.Property(e => e.Comensales).HasColumnName("comensales");
             entity.Property(e => e.Limpieza).HasColumnName("limpieza");
-            entity.Property(e => e.TipoReserva).HasColumnName("tipo_reserva");
+            entity.Property(e => e.TipoReservaId).HasColumnName("tipo_reserva");
             entity.Property(e => e.Estado).HasColumnName("estado");
             // El default de la columna es now(): así EF omite created_at al insertar null.
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
@@ -137,6 +139,19 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(e => e.Socio)
                 .WithMany()
                 .HasForeignKey(e => e.SocioId);
+
+            entity.HasOne(e => e.TipoReserva)
+                .WithMany(t => t.Reservas)
+                .HasForeignKey(e => e.TipoReservaId);
+        });
+
+        modelBuilder.Entity<TipoReserva>(entity =>
+        {
+            entity.ToTable("tipo_reserva");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_tipo_reserva");
+            entity.Property(e => e.Descripcion).HasColumnName("TipoReserva").IsRequired();
         });
 
         modelBuilder.Entity<ReservaMesa>(entity =>

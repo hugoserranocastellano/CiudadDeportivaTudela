@@ -1,6 +1,7 @@
 @page "/reservas"
 @rendermode InteractiveServer
 @attribute [Authorize]
+@using System.Globalization
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Reservas</PageTitle>
@@ -8,7 +9,6 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Reservas</h1>
-    <button class="btn btn-pena" @onclick="Nuevo">Nueva reserva</button>
 </div>
 
 @if (error is not null)
@@ -16,116 +16,54 @@
     <div class="alert alert-danger" role="alert"><code>@error</code></div>
 }
 
-@if (edicion is not null)
-{
-    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
-        <DataAnnotationsValidator />
-        <div class="card-header fw-semibold">@(esNuevo ? "Nueva reserva" : $"Editar reserva #{edicion.Id}")</div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Fecha</label>
-                    <InputDate class="form-control" @bind-Value="edicion.Fecha" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Socio</label>
-                    <InputSelect class="form-select" @bind-Value="edicion.SocioId">
-                        <option value="">(sin socio)</option>
-                        @foreach (var socio in socios)
-                        {
-                            <option value="@socio.Id">@socio.Texto</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">Comensales</label>
-                    <InputNumber class="form-control" @bind-Value="edicion.Comensales" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Tipo de reserva</label>
-                    <InputText class="form-control" list="tiposReserva" @bind-Value="edicion.TipoReserva" />
-                    <datalist id="tiposReserva">
-                        <option value="comida" />
-                        <option value="cena" />
-                        <option value="almuerzo" />
-                        <option value="celebración" />
-                    </datalist>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Estado</label>
-                    <InputSelect class="form-select" @bind-Value="edicion.Estado">
-                        <option value="activa">activa</option>
-                        <option value="cancelada">cancelada</option>
-                        <option value="cerrada">cerrada</option>
-                    </InputSelect>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <div class="form-check">
-                        <InputCheckbox class="form-check-input" @bind-Value="limpieza" id="resLimpieza" />
-                        <label class="form-check-label" for="resLimpieza">Limpieza hecha</label>
-                    </div>
-                </div>
-            </div>
-            <ValidationSummary class="mt-3 small" />
-        </div>
-        <div class="card-footer d-flex gap-2">
-            <button type="submit" class="btn btn-pena">Guardar</button>
-            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
-        </div>
-    </EditForm>
-}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Mes anterior</button>
+    <h4 class="mb-0 text-capitalize">@mesActual.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("es-ES"))</h4>
+    <button class="btn btn-outline-secondary" disabled="@(!PuedeAvanzar)" @onclick="MesSiguiente">Mes siguiente →</button>
+</div>
 
-@if (reservas is null)
+@if (dias is null)
 {
     <p><em>Cargando...</em></p>
 }
-else if (reservas.Count == 0)
-{
-    <p><em>No hay reservas registradas.</em></p>
-}
 else
 {
-    <p class="text-muted">@reservas.Count reserva(s).</p>
-
     <div class="table-responsive">
-        <table class="table table-striped align-middle">
+        <table class="table table-bordered calendario-reservas align-top">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Fecha</th>
-                    <th>Socio</th>
-                    <th class="text-end">Comensales</th>
-                    <th>Tipo</th>
-                    <th>Estado</th>
-                    <th>Limpieza</th>
-                    <th>Mesas</th>
-                    <th class="text-end">Acciones</th>
+                    @foreach (var nombreDia in nombresDias)
+                    {
+                        <th class="text-center">@nombreDia</th>
+                    }
                 </tr>
             </thead>
             <tbody>
-                @foreach (var reserva in reservas)
+                @foreach (var semana in Semanas())
                 {
                     <tr>
-                        <td>@reserva.Id</td>
-                        <td>@reserva.Fecha.ToShortDateString()</td>
-                        <td>@NombreSocio(reserva.SocioId)</td>
-                        <td class="text-end">@reserva.Comensales</td>
-                        <td>@reserva.TipoReserva</td>
-                        <td>@reserva.Estado</td>
-                        <td>@(reserva.Limpieza == true ? "Sí" : "No")</td>
-                        <td>@(reserva.Mesas.Count == 0 ? "—" : string.Join(", ", reserva.Mesas))</td>
-                        <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(reserva.Id)">Editar</button>
-                            @if (idBorrando == reserva.Id)
+                        @foreach (var dia in semana)
+                        {
+                            @if (dia is null)
                             {
-                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(reserva.Id)">Confirmar</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                                <td class="bg-light"></td>
                             }
                             else
                             {
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = reserva.Id">Borrar</button>
+                                var celda = dia.Value;
+                                var habilitado = EnRango(celda);
+                                <td class="@(habilitado ? "dia-habilitado" : "text-muted bg-light")" style="cursor:@(habilitado ? "pointer" : "default")" @onclick="() => AbrirDia(celda)">
+                                    <div class="fw-semibold">@celda.Day</div>
+                                    @foreach (var tipo in tipos)
+                                    {
+                                        @if (ocupacion.TryGetValue((celda, tipo.Id), out var oc) && oc > 0)
+                                        {
+                                            <div class="small">@Abrev(tipo.Descripcion): @oc/@aforoMaximo</div>
+                                        }
+                                    }
+                                </td>
                             }
-                        </td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -133,28 +71,242 @@ else
     </div>
 }
 
+@if (diaSeleccionado is not null)
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@diaSeleccionado.Value.ToString("dddd, d 'de' MMMM", CultureInfo.GetCultureInfo("es-ES"))</span>
+            <button class="btn-close" @onclick="CerrarDia" aria-label="Cerrar"></button>
+        </div>
+        <div class="card-body">
+            @if (reservasDelDia is null)
+            {
+                <p><em>Cargando...</em></p>
+            }
+            else if (reservasDelDia.Count == 0)
+            {
+                <p class="text-muted">No hay reservas este día.</p>
+            }
+            else
+            {
+                @foreach (var grupo in reservasDelDia.GroupBy(r => r.TipoReservaDescripcion))
+                {
+                    <h6 class="mt-2">@grupo.Key</h6>
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        @foreach (var r in grupo)
+                        {
+                            <div class="d-flex align-items-center gap-2 border rounded p-2">
+                                @if (!string.IsNullOrWhiteSpace(r.SocioFoto))
+                                {
+                                    <img src="@r.SocioFoto" alt="@r.SocioNombre" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width:40px;height:40px;">?</div>
+                                }
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">@r.SocioNombre</div>
+                                    <div class="small text-muted">@r.Comensales comensal(es) · @(r.Mesas.Count == 0 ? "sin mesa" : string.Join(", ", r.Mesas))</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            @if (edicion is null)
+            {
+                <button class="btn btn-pena" disabled="@(!EnRango(diaSeleccionado.Value))" @onclick="Nuevo">Nueva reserva este día</button>
+            }
+            else
+            {
+                <EditForm Model="edicion" OnValidSubmit="Guardar" class="card">
+                    <DataAnnotationsValidator />
+                    <div class="card-header fw-semibold">Nueva reserva</div>
+                    <div class="card-body">
+                        @if (errorForm is not null)
+                        {
+                            <div class="alert alert-danger py-2">@errorForm</div>
+                        }
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Tipo de reserva</label>
+                                <InputSelect class="form-select" @bind-Value="edicion.TipoReservaId" @bind-Value:after="CargarMesasDisponibles">
+                                    @foreach (var tipo in tipos)
+                                    {
+                                        <option value="@tipo.Id">@tipo.Descripcion</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">Socio</label>
+                                <InputSelect class="form-select" @bind-Value="edicion.SocioId">
+                                    <option value="">(sin socio)</option>
+                                    @foreach (var socio in socios)
+                                    {
+                                        <option value="@socio.Id">@socio.Texto</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Comensales</label>
+                                <InputNumber class="form-control" @bind-Value="edicion.Comensales" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Mesas disponibles</label>
+                                @if (mesasDisponibles is null)
+                                {
+                                    <p class="text-muted small"><em>Cargando...</em></p>
+                                }
+                                else if (mesasDisponibles.Count == 0)
+                                {
+                                    <p class="text-muted small">No quedan mesas libres para este turno.</p>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-wrap gap-3">
+                                        @foreach (var mesa in mesasDisponibles)
+                                        {
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="@("mesa" + mesa.Id)"
+                                                       checked="@mesasSeleccionadas.Contains(mesa.Id)"
+                                                       @onchange="@(e => AlternarMesa(mesa.Id, (bool)e.Value!))" />
+                                                <label class="form-check-label" for="@("mesa" + mesa.Id)">
+                                                    @mesa.Descripcion (@mesa.Capacidad plazas)
+                                                </label>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <ValidationSummary class="mt-3 small" />
+                    </div>
+                    <div class="card-footer d-flex gap-2">
+                        <button type="submit" class="btn btn-pena">Guardar</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelarForm">Cancelar</button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+}
+
 @code {
-    private List<Fila>? reservas;
+    private static readonly string[] nombresDias = { "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" };
+
+    private DateOnly hoy;
+    private DateOnly limiteMax;
+    private DateOnly mesActual;
+    private List<DateOnly>? dias;
+    private Dictionary<(DateOnly, long), int> ocupacion = new();
+    private int aforoMaximo;
     private List<Opcion> socios = new();
-    private Dictionary<long, string> nombresSocio = new();
-    private Reserva? edicion;
-    private bool esNuevo;
-    private bool limpieza;
-    private long? idBorrando;
+    private List<TipoReserva> tipos = new();
     private string? error;
 
-    // Los nombres se resuelven en memoria: así la consulta no arrastra joins ni
-    // concatenaciones que Npgsql tendría que traducir.
-    private string NombreSocio(long? id) =>
-        id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "—";
+    private static string Abrev(string descripcion) => descripcion.Length <= 4 ? descripcion : descripcion[..3] + ".";
 
-    protected override Task OnInitializedAsync() => Cargar();
+    private DateOnly? diaSeleccionado;
+    private List<ReservaFila>? reservasDelDia;
 
-    private async Task Cargar()
+    private Reserva? edicion;
+    private string? errorForm;
+    private List<Mesa>? mesasDisponibles;
+    private HashSet<long> mesasSeleccionadas = new();
+
+    private bool PuedeRetroceder => new DateOnly(mesActual.Year, mesActual.Month, 1) > new DateOnly(hoy.Year, hoy.Month, 1);
+    private bool PuedeAvanzar => new DateOnly(mesActual.Year, mesActual.Month, 1) < new DateOnly(limiteMax.Year, limiteMax.Month, 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        hoy = DateOnly.FromDateTime(DateTime.Today);
+        limiteMax = hoy.AddMonths(2);
+        mesActual = hoy;
+        await CargarMes();
+    }
+
+    private bool EnRango(DateOnly fecha) => fecha >= hoy && fecha <= limiteMax;
+
+    private IEnumerable<DateOnly?[]> Semanas()
+    {
+        if (dias is null)
+        {
+            yield break;
+        }
+
+        var primerDia = new DateOnly(mesActual.Year, mesActual.Month, 1);
+        var offset = ((int)primerDia.DayOfWeek + 6) % 7; // lunes = 0
+        var celdas = new List<DateOnly?>();
+        for (var i = 0; i < offset; i++)
+        {
+            celdas.Add(null);
+        }
+        celdas.AddRange(dias.Select(d => (DateOnly?)d));
+        while (celdas.Count % 7 != 0)
+        {
+            celdas.Add(null);
+        }
+
+        for (var i = 0; i < celdas.Count; i += 7)
+        {
+            yield return celdas.Skip(i).Take(7).ToArray();
+        }
+    }
+
+    private async Task MesAnterior()
+    {
+        if (!PuedeRetroceder)
+        {
+            return;
+        }
+        mesActual = mesActual.AddMonths(-1);
+        CerrarDia();
+        await CargarMes();
+    }
+
+    private async Task MesSiguiente()
+    {
+        if (!PuedeAvanzar)
+        {
+            return;
+        }
+        mesActual = mesActual.AddMonths(1);
+        CerrarDia();
+        await CargarMes();
+    }
+
+    private async Task CargarMes()
     {
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
+
+            var primerDia = new DateOnly(mesActual.Year, mesActual.Month, 1);
+            var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
+            dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
+
+            aforoMaximo = await db.Mesas.Where(m => m.Activa != false).SumAsync(m => (int?)m.Capacidad) ?? 0;
+
+            var filas = await db.Reservas
+                .AsNoTracking()
+                .Where(r => r.Estado == "activa" && r.Fecha >= primerDia && r.Fecha <= ultimoDia && r.TipoReservaId != null)
+                .Select(r => new
+                {
+                    r.Fecha,
+                    TipoReservaId = r.TipoReservaId!.Value,
+                    Ocupacion = r.ReservaMesas.Sum(rm => (int?)rm.Mesa!.Capacidad) ?? 0
+                })
+                .ToListAsync();
+
+            ocupacion = filas
+                .GroupBy(f => (f.Fecha, f.TipoReservaId))
+                .ToDictionary(g => g.Key, g => g.Sum(f => f.Ocupacion));
+
+            tipos = await db.TiposReserva
+                .AsNoTracking()
+                .OrderBy(t => t.Descripcion)
+                .ToListAsync();
 
             socios = (await db.Socios
                     .AsNoTracking()
@@ -164,20 +316,54 @@ else
                 .Select(s => new Opcion(s.Id, $"{s.Dni} · {s.Nombre} {s.Apellidos}".TrimEnd()))
                 .ToList();
 
-            nombresSocio = socios.ToDictionary(s => s.Id, s => s.Texto);
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
 
-            reservas = await db.Reservas
+    private async Task AbrirDia(DateOnly fecha)
+    {
+        if (!EnRango(fecha))
+        {
+            return;
+        }
+
+        diaSeleccionado = fecha;
+        edicion = null;
+        errorForm = null;
+        await CargarReservasDelDia();
+    }
+
+    private void CerrarDia()
+    {
+        diaSeleccionado = null;
+        reservasDelDia = null;
+        edicion = null;
+    }
+
+    private async Task CargarReservasDelDia()
+    {
+        if (diaSeleccionado is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            reservasDelDia = await db.Reservas
                 .AsNoTracking()
-                .OrderByDescending(r => r.Fecha)
-                .ThenByDescending(r => r.Id)
-                .Select(r => new Fila(
-                    r.Id,
-                    r.Fecha,
-                    r.SocioId,
-                    r.Comensales,
-                    r.TipoReserva,
-                    r.Estado,
-                    r.Limpieza,
+                .Where(r => r.Estado == "activa" && r.Fecha == diaSeleccionado.Value)
+                .OrderBy(r => r.TipoReserva!.Descripcion)
+                .Select(r => new ReservaFila(
+                    r.TipoReserva != null ? r.TipoReserva.Descripcion : "(sin tipo)",
+                    r.Socio != null ? $"{r.Socio.Nombre} {r.Socio.Apellidos}".Trim() : "(sin socio)",
+                    r.Socio != null ? r.Socio.UrlFoto : null,
+                    r.Comensales ?? 0,
                     r.ReservaMesas.Select(rm => rm.Mesa!.Descripcion).ToList()))
                 .ToListAsync();
 
@@ -185,39 +371,72 @@ else
         }
         catch (Exception ex)
         {
-            reservas ??= new List<Fila>();
             error = ex.Message;
         }
     }
 
     private void Nuevo()
     {
-        edicion = new Reserva();
-        limpieza = false;
-        esNuevo = true;
-        idBorrando = null;
+        if (diaSeleccionado is null)
+        {
+            return;
+        }
+
+        edicion = new Reserva { Fecha = diaSeleccionado.Value, TipoReservaId = tipos.FirstOrDefault()?.Id };
+        mesasSeleccionadas = new HashSet<long>();
+        errorForm = null;
+        _ = CargarMesasDisponibles();
     }
 
-    private async Task Editar(long id)
+    private void CancelarForm()
     {
-        idBorrando = null;
+        edicion = null;
+        errorForm = null;
+    }
+
+    private async Task CargarMesasDisponibles()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
 
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            // Sin Include: al guardar sólo debe viajar la reserva, no el socio.
-            edicion = await db.Reservas.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-            limpieza = edicion?.Limpieza == true;
-            esNuevo = false;
+            var ocupadas = await db.ReservaMesas
+                .Where(rm => rm.Reserva!.Estado == "activa"
+                    && rm.Reserva.Fecha == edicion.Fecha
+                    && rm.Reserva.TipoReservaId == edicion.TipoReservaId)
+                .Select(rm => rm.MesaId!.Value)
+                .ToListAsync();
+
+            mesasDisponibles = await db.Mesas
+                .AsNoTracking()
+                .Where(m => m.Activa != false && !ocupadas.Contains(m.Id))
+                .OrderBy(m => m.Descripcion)
+                .ToListAsync();
+
+            mesasSeleccionadas.RemoveWhere(id => mesasDisponibles.All(m => m.Id != id));
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            errorForm = ex.Message;
         }
     }
 
-    private void Cancelar() => edicion = null;
+    private void AlternarMesa(long mesaId, bool marcada)
+    {
+        if (marcada)
+        {
+            mesasSeleccionadas.Add(mesaId);
+        }
+        else
+        {
+            mesasSeleccionadas.Remove(mesaId);
+        }
+    }
 
     private async Task Guardar()
     {
@@ -226,58 +445,71 @@ else
             return;
         }
 
-        edicion.Limpieza = limpieza;
+        if (!EnRango(edicion.Fecha))
+        {
+            errorForm = "La fecha debe estar entre hoy y dentro de dos meses.";
+            return;
+        }
+
+        if (edicion.TipoReservaId is null)
+        {
+            errorForm = "Selecciona un tipo de reserva.";
+            return;
+        }
+
+        if (mesasSeleccionadas.Count == 0)
+        {
+            errorForm = "Selecciona al menos una mesa.";
+            return;
+        }
 
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            if (esNuevo)
+            // Revalidar disponibilidad por si otro admin reservó mientras el formulario estaba abierto.
+            var ocupadasAhora = await db.ReservaMesas
+                .Where(rm => rm.Reserva!.Estado == "activa"
+                    && rm.Reserva.Fecha == edicion.Fecha
+                    && rm.Reserva.TipoReservaId == edicion.TipoReservaId
+                    && mesasSeleccionadas.Contains(rm.MesaId!.Value))
+                .AnyAsync();
+
+            if (ocupadasAhora)
             {
-                db.Reservas.Add(edicion);
-            }
-            else
-            {
-                db.Reservas.Update(edicion);
+                errorForm = "Alguna de las mesas seleccionadas ya no está disponible.";
+                await CargarMesasDisponibles();
+                return;
             }
 
+            var mesasElegidas = await db.Mesas
+                .Where(m => mesasSeleccionadas.Contains(m.Id))
+                .ToListAsync();
+
+            var capacidadTotal = mesasElegidas.Sum(m => m.Capacidad);
+            if (capacidadTotal < (edicion.Comensales ?? 0))
+            {
+                errorForm = $"Las mesas seleccionadas suman {capacidadTotal} plazas, no llegan para {edicion.Comensales} comensales.";
+                return;
+            }
+
+            edicion.ReservaMesas = mesasElegidas.Select(m => new ReservaMesa { MesaId = m.Id }).ToList();
+            db.Reservas.Add(edicion);
             await db.SaveChangesAsync();
+
             edicion = null;
-            await Cargar();
+            mesasSeleccionadas.Clear();
+            errorForm = null;
+            await CargarMes();
+            await CargarReservasDelDia();
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            errorForm = ex.Message;
         }
     }
-
-    private async Task Borrar(long id)
-    {
-        idBorrando = null;
-
-        try
-        {
-            await using var db = await DbFactory.CreateDbContextAsync();
-
-            // reserva_mesas cae en cascada por la FK.
-            await db.Reservas.Where(r => r.Id == id).ExecuteDeleteAsync();
-            await Cargar();
-        }
-        catch (Exception ex)
-        {
-            error = $"No se pudo borrar la reserva: {ex.Message}";
-        }
-    }
-
-    private record Fila(
-        long Id,
-        DateOnly Fecha,
-        long? SocioId,
-        int? Comensales,
-        string? TipoReserva,
-        string? Estado,
-        bool? Limpieza,
-        List<string> Mesas);
 
     private record Opcion(long Id, string Texto);
+
+    private record ReservaFila(string TipoReservaDescripcion, string SocioNombre, string? SocioFoto, int Comensales, List<string> Mesas);
 }

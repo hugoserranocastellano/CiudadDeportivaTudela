@@ -117,7 +117,7 @@ else
                     r.Id,
                     r.Fecha,
                     r.Comensales,
-                    r.TipoReserva,
+                    r.TipoReserva != null ? r.TipoReserva.Descripcion : "(sin tipo)",
                     r.Estado,
                     r.Limpieza,
                     r.ReservaMesas.Select(rm => rm.Mesa!.Descripcion).ToList()))
@@ -165,7 +165,7 @@ else
         long Id,
         DateOnly Fecha,
         int? Comensales,
-        string? TipoReserva,
+        string TipoReserva,
         string? Estado,
         bool? Limpieza,
         List<string> Mesas);
