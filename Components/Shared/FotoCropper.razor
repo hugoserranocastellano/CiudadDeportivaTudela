@@ -1,0 +1,178 @@
+@* Selector de foto con recorte cuadrado (mover + zoom) antes de subir a
+   Supabase Storage. Encapsula InputFile + canvas + subida, así los
+   formularios que la usan solo reciben la URL final. *@
+@inject IJSRuntime JS
+@inject SupabaseStorageService Storage
+@implements IAsyncDisposable
+
+<div>
+    @if (!string.IsNullOrWhiteSpace(FotoActualUrl) && !recortando)
+    {
+        <div class="mb-2">
+            <img src="@FotoActualUrl" alt="Foto actual" style="max-height:220px" class="rounded" />
+        </div>
+    }
+
+    @if (recortando)
+    {
+        <div class="card mb-2" style="max-width: 320px;">
+            <div class="card-body text-center">
+                <canvas id="@canvasId" width="300" height="300" class="rounded border" style="touch-action:none; cursor:move;"></canvas>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(-1)">−</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(1)">+</button>
+                </div>
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-pena" @onclick="Confirmar" disabled="@subiendo">
+                        @(subiendo ? "Subiendo..." : "Usar esta foto")
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancelar" disabled="@subiendo">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <InputFile class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@Disabled" />
+    }
+
+    @if (error is not null)
+    {
+        <div class="text-danger small mt-1">@error</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Bucket { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Path { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? FotoActualUrl { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<string> FotoSubida { get; set; }
+
+    private readonly string canvasId = $"fotoCropper-{Guid.NewGuid():N}";
+    private IJSObjectReference? modulo;
+    private bool recortando;
+    private bool subiendo;
+    private bool cargado;
+    private string? error;
+
+    private async Task<IJSObjectReference> ModuloAsync()
+    {
+        modulo ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/fotoCropper.js");
+        return modulo;
+    }
+
+    private async Task ElegirArchivo(InputFileChangeEventArgs e)
+    {
+        error = null;
+
+        try
+        {
+            var archivo = e.File;
+            using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var memoria = new MemoryStream();
+            await stream.CopyToAsync(memoria);
+
+            var base64 = Convert.ToBase64String(memoria.ToArray());
+            var dataUrl = $"data:{archivo.ContentType};base64,{base64}";
+
+            recortando = true;
+            StateHasChanged();
+            // El canvas todavía no existe en el DOM hasta que Blazor renderiza
+            // el bloque "recortando"; se espera un ciclo antes de cargar la imagen.
+            await Task.Yield();
+
+            var js = await ModuloAsync();
+            await js.InvokeVoidAsync("cargar", canvasId, dataUrl);
+            cargado = true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            recortando = false;
+        }
+    }
+
+    private async Task Zoom(int delta)
+    {
+        if (!cargado)
+        {
+            return;
+        }
+
+        var js = await ModuloAsync();
+        await js.InvokeVoidAsync("zoom", canvasId, delta);
+    }
+
+    private async Task Confirmar()
+    {
+        if (!cargado)
+        {
+            return;
+        }
+
+        subiendo = true;
+        error = null;
+        try
+        {
+            var js = await ModuloAsync();
+            var base64 = await js.InvokeAsync<string>("recortar", canvasId, 600);
+            var bytes = Convert.FromBase64String(base64);
+
+            using var stream = new MemoryStream(bytes);
+            var url = await Storage.SubirAsync(Bucket, $"{Path}.jpg", stream, "image/jpeg");
+
+            await CerrarRecorte();
+            await FotoSubida.InvokeAsync(url);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            subiendo = false;
+        }
+    }
+
+    private async Task Cancelar() => await CerrarRecorte();
+
+    private async Task CerrarRecorte()
+    {
+        if (cargado && modulo is not null)
+        {
+            await modulo.InvokeVoidAsync("destruir", canvasId);
+        }
+
+        cargado = false;
+        recortando = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (modulo is not null)
+        {
+            try
+            {
+                if (cargado)
+                {
+                    await modulo.InvokeVoidAsync("destruir", canvasId);
+                }
+                await modulo.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // El circuito ya se cerró (navegación, cierre de pestaña); nada que limpiar.
+            }
+        }
+    }
+}

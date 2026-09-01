@@ -4,7 +4,6 @@
 @using System.ComponentModel.DataAnnotations
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager Navegacion
-@inject SupabaseStorageService Storage
 
 <PageTitle>Inicio · Peña Ciudad Deportiva</PageTitle>
 
@@ -57,17 +56,8 @@ else
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Foto</label>
-                        @if (!string.IsNullOrWhiteSpace(datosEdicion!.UrlFoto))
-                        {
-                            <div class="mb-2">
-                                <img src="@datosEdicion.UrlFoto" alt="Foto de @socio.Nombre" style="max-height:220px" class="rounded" />
-                            </div>
-                        }
-                        <InputFile class="form-control" OnChange="SubirFoto" accept="image/*" disabled="@subiendoFoto" />
-                        @if (subiendoFoto)
-                        {
-                            <div class="form-text">Subiendo...</div>
-                        }
+                        <FotoCropper Bucket="Socios" Path="@socioId?.ToString()" FotoActualUrl="@datosEdicion!.UrlFoto"
+                                     FotoSubida="@(url => datosEdicion.UrlFoto = url)" />
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Cuenta bancaria</label>
@@ -90,48 +80,32 @@ else
         </EditForm>
     }
 
-    <div class="row row-cols-1 row-cols-md-4 g-3 mb-4">
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Tickets</h2>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-sm btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-tickets"))">Historial</button>
-                    </div>
-                </div>
+    <div class="list-group mb-4">
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="fw-semibold">Tickets</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-tickets"))">Historial</button>
             </div>
         </div>
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Reservas</h2>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
-                    </div>
-                </div>
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="fw-semibold">Reservas</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
             </div>
         </div>
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Sugerencias</h2>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
-                    </div>
-                </div>
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="fw-semibold">Sugerencias</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
             </div>
         </div>
-        <div class="col">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h2 class="h5 card-title">Eventos</h2>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-eventos"))">Historial</button>
-                    </div>
-                </div>
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="fw-semibold">Eventos</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => Navegacion.NavigateTo("/mis-eventos"))">Historial</button>
             </div>
         </div>
     </div>
@@ -231,7 +205,6 @@ else
 
     private bool mostrarCuenta;
     private bool editandoDatos;
-    private bool subiendoFoto;
     private DatosSocio? datosEdicion;
 
     private enum Accion { Ninguna, Reserva, Sugerencia }
@@ -323,38 +296,6 @@ else
         };
         editandoDatos = true;
         mensaje = null;
-    }
-
-    private async Task SubirFoto(InputFileChangeEventArgs e)
-    {
-        if (socioId is null || datosEdicion is null)
-        {
-            return;
-        }
-
-        subiendoFoto = true;
-        error = null;
-        try
-        {
-            var archivo = e.File;
-            var extension = Path.GetExtension(archivo.Name);
-            if (string.IsNullOrWhiteSpace(extension))
-            {
-                extension = ".jpg";
-            }
-
-            await using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
-            var url = await Storage.SubirAsync("Socios", $"{socioId}{extension}", stream, archivo.ContentType);
-            datosEdicion.UrlFoto = url;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
-        finally
-        {
-            subiendoFoto = false;
-        }
     }
 
     private async Task GuardarDatos()
