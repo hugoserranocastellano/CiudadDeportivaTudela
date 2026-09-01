@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager Navegacion
+@inject SupabaseStorageService Storage
 
 <PageTitle>Inicio · Peña Ciudad Deportiva</PageTitle>
 
@@ -55,8 +56,18 @@ else
                         <InputText class="form-control" @bind-Value="datosEdicion!.Email" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">URL de la foto</label>
-                        <InputText class="form-control" @bind-Value="datosEdicion!.UrlFoto" />
+                        <label class="form-label">Foto</label>
+                        @if (!string.IsNullOrWhiteSpace(datosEdicion!.UrlFoto))
+                        {
+                            <div class="mb-2">
+                                <img src="@datosEdicion.UrlFoto" alt="Foto de @socio.Nombre" style="max-height:100px" class="rounded" />
+                            </div>
+                        }
+                        <InputFile class="form-control" OnChange="SubirFoto" accept="image/*" disabled="@subiendoFoto" />
+                        @if (subiendoFoto)
+                        {
+                            <div class="form-text">Subiendo...</div>
+                        }
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Cuenta bancaria</label>
@@ -180,6 +191,7 @@ else
 
     private bool mostrarCuenta;
     private bool editandoDatos;
+    private bool subiendoFoto;
     private DatosSocio? datosEdicion;
 
     private enum Accion { Ninguna, Reserva, Sugerencia }
@@ -271,6 +283,38 @@ else
         };
         editandoDatos = true;
         mensaje = null;
+    }
+
+    private async Task SubirFoto(InputFileChangeEventArgs e)
+    {
+        if (socioId is null || datosEdicion is null)
+        {
+            return;
+        }
+
+        subiendoFoto = true;
+        error = null;
+        try
+        {
+            var archivo = e.File;
+            var extension = Path.GetExtension(archivo.Name);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".jpg";
+            }
+
+            await using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var url = await Storage.SubirAsync("Socios", $"{socioId}{extension}", stream, archivo.ContentType);
+            datosEdicion.UrlFoto = url;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            subiendoFoto = false;
+        }
     }
 
     private async Task GuardarDatos()

@@ -49,6 +49,8 @@ var connectionString = PostgresConnectionString.Normalize(rawConnectionString);
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+builder.Services.AddHttpClient<SupabaseStorageService>();
+
 var app = builder.Build();
 
 // Sin esto, un 28P01 no permite distinguir entre contraseña mala y usuario mal formado.

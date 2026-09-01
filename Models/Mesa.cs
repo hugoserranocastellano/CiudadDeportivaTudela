@@ -16,5 +16,7 @@ public class Mesa
 
     public bool? Activa { get; set; } = true;
 
+    public string? UrlFotoMesa { get; set; }
+
     public ICollection<ReservaMesa> ReservaMesas { get; set; } = new List<ReservaMesa>();
 }

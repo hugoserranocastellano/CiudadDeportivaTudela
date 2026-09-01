@@ -116,6 +116,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Estancia).HasColumnName("estancia");
             entity.Property(e => e.Capacidad).HasColumnName("capacidad");
             entity.Property(e => e.Activa).HasColumnName("activa");
+            entity.Property(e => e.UrlFotoMesa).HasColumnName("url_foto_mesa");
         });
 
         modelBuilder.Entity<Reserva>(entity =>

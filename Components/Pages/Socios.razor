@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IConfiguration Configuration
+@inject SupabaseStorageService Storage
 
 <PageTitle>Socios</PageTitle>
 <JuntaGuard />
@@ -73,8 +74,25 @@
                     <InputText class="form-control" @bind-Value="edicion.NumeroCuenta" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">URL de la foto</label>
-                    <InputText class="form-control" @bind-Value="edicion.UrlFoto" />
+                    <label class="form-label">Foto</label>
+                    @if (!string.IsNullOrWhiteSpace(edicion.UrlFoto))
+                    {
+                        <div class="mb-2">
+                            <img src="@edicion.UrlFoto" alt="Foto de @edicion.Nombre" style="max-height:100px" class="rounded" />
+                        </div>
+                    }
+                    @if (esNuevo)
+                    {
+                        <div class="form-text">Guarda primero el socio para poder subir su foto.</div>
+                    }
+                    else
+                    {
+                        <InputFile class="form-control" OnChange="SubirFoto" accept="image/*" disabled="@subiendoFoto" />
+                        @if (subiendoFoto)
+                        {
+                            <div class="form-text">Subiendo...</div>
+                        }
+                    }
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Fecha de alta</label>
@@ -168,6 +186,7 @@ else
     private bool esNuevo;
     private bool activo = true;
     private long? idBorrando;
+    private bool subiendoFoto;
     private string filtro = string.Empty;
     private string? error;
     private string? diagnostico;
@@ -299,6 +318,37 @@ else
     }
 
     private void Cancelar() => edicion = null;
+
+    private async Task SubirFoto(InputFileChangeEventArgs e)
+    {
+        if (edicion is null || esNuevo)
+        {
+            return;
+        }
+
+        subiendoFoto = true;
+        error = null;
+        try
+        {
+            var archivo = e.File;
+            var extension = Path.GetExtension(archivo.Name);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".jpg";
+            }
+
+            await using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            edicion.UrlFoto = await Storage.SubirAsync("Socios", $"{edicion.Id}{extension}", stream, archivo.ContentType);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            subiendoFoto = false;
+        }
+    }
 
     private async Task Guardar()
     {
