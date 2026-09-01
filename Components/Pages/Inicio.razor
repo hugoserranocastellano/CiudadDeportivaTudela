@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using System.ComponentModel.DataAnnotations
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navegacion
 
 <PageTitle>Inicio · Peña Ciudad Deportiva</PageTitle>
 
@@ -79,31 +80,10 @@ else
     }
 
     <div class="d-flex flex-wrap gap-2 mb-4">
-        <button class="btn btn-pena" @onclick="AbrirNuevoTicket">Nuevo ticket</button>
+        <button class="btn btn-pena" @onclick="@(() => Navegacion.NavigateTo("/tickets/nuevo"))">Nuevo ticket</button>
         <button class="btn btn-pena" @onclick="AbrirNuevaReserva">Nueva reserva</button>
         <button class="btn btn-pena" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
     </div>
-
-    @if (accion == Accion.Ticket)
-    {
-        <EditForm Model="nuevoTicket" OnValidSubmit="GuardarTicket" class="card mb-4">
-            <div class="card-header fw-semibold">Nuevo ticket</div>
-            <div class="card-body row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Importe total (€)</label>
-                    <InputNumber class="form-control" step="0.01" @bind-Value="nuevoTicket!.ImporteTotal" />
-                </div>
-                <div class="col-md-8">
-                    <label class="form-label">URL de la foto del ticket (opcional)</label>
-                    <InputText class="form-control" @bind-Value="nuevoTicket!.UrlFotoTicket" />
-                </div>
-            </div>
-            <div class="card-footer d-flex gap-2">
-                <button type="submit" class="btn btn-pena">Guardar</button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="CerrarAccion">Cancelar</button>
-            </div>
-        </EditForm>
-    }
 
     @if (accion == Accion.Reserva)
     {
@@ -202,10 +182,9 @@ else
     private bool editandoDatos;
     private DatosSocio? datosEdicion;
 
-    private enum Accion { Ninguna, Ticket, Reserva, Sugerencia }
+    private enum Accion { Ninguna, Reserva, Sugerencia }
     private Accion accion = Accion.Ninguna;
 
-    private Ticket? nuevoTicket;
     private Reserva? nuevaReserva;
     private bool limpieza;
     private Sugerencia? nuevaSugerencia;
@@ -325,40 +304,6 @@ else
     }
 
     private void CerrarAccion() => accion = Accion.Ninguna;
-
-    private void AbrirNuevoTicket()
-    {
-        nuevoTicket = new Ticket { Fecha = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified) };
-        accion = Accion.Ticket;
-        mensaje = null;
-    }
-
-    private async Task GuardarTicket()
-    {
-        if (socioId is null || nuevoTicket is null)
-        {
-            return;
-        }
-
-        nuevoTicket.SocioId = socioId;
-        nuevoTicket.Revisado = false;
-
-        try
-        {
-            await using var db = await DbFactory.CreateDbContextAsync();
-
-            db.Tickets.Add(nuevoTicket);
-            await db.SaveChangesAsync();
-
-            accion = Accion.Ninguna;
-            mensaje = "Ticket registrado. La junta lo revisará en breve.";
-            error = null;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
-    }
 
     private void AbrirNuevaReserva()
     {

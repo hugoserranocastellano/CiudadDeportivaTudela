@@ -1,0 +1,243 @@
+@page "/tickets/nuevo"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navegacion
+
+<PageTitle>Nuevo ticket · Peña Ciudad Deportiva</PageTitle>
+
+@if (socio is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="mb-0">Nuevo ticket</h1>
+            <div class="text-muted">@socio.Nombre @socio.Apellidos · @fecha.ToString("dd/MM/yyyy HH:mm")</div>
+        </div>
+    </div>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger py-2"><code>@error</code></div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <label class="form-label">Añadir producto</label>
+            <div class="d-flex flex-wrap gap-2">
+                <input class="form-control" style="max-width: 220px;" placeholder="Buscar producto (ej. cer)"
+                       @bind="filtro" @bind:event="oninput" />
+                <select class="form-select" style="max-width: 320px;" @bind="articuloSeleccionadoId">
+                    <option value="">-- selecciona --</option>
+                    @foreach (var a in ArticulosFiltrados)
+                    {
+                        <option value="@a.Id">@a.Descripcion (@a.PrecioUnidad.ToString("0.00")€)</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-pena" @onclick="AnadirProducto">+</button>
+            </div>
+        </div>
+    </div>
+
+    @if (lineas.Count == 0)
+    {
+        <p class="text-muted">Aún no has añadido ningún producto.</p>
+    }
+    else
+    {
+        <div class="table-responsive mb-3">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Precio</th>
+                        <th>Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var linea in lineas)
+                    {
+                        <tr>
+                            <td>@linea.Articulo!.Descripcion</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CambiarCantidad(linea, -1)">-</button>
+                                    <span>@linea.Unidades</span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => CambiarCantidad(linea, 1)">+</button>
+                                </div>
+                            </td>
+                            <td>@linea.PrecioUnidad?.ToString("0.00")€</td>
+                            <td>@linea.Subtotal?.ToString("0.00")€</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => EliminarLinea(linea)" title="Eliminar línea">🗑</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="3" class="text-end">Total</th>
+                        <th>@Total.ToString("0.00")€</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="Guardar">Guardar</button>
+        <button type="button" class="btn btn-outline-danger" @onclick="Eliminar">Eliminar</button>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private Socio? socio;
+    private DateTime fecha = DateTime.Now;
+
+    private List<Articulo> articulos = new();
+    private string filtro = string.Empty;
+    private string articuloSeleccionadoId = string.Empty;
+
+    private List<TicketLinea> lineas = new();
+
+    private string? error;
+
+    private IEnumerable<Articulo> ArticulosFiltrados =>
+        string.IsNullOrWhiteSpace(filtro)
+            ? articulos
+            : articulos.Where(a => a.Descripcion.Contains(filtro, StringComparison.OrdinalIgnoreCase));
+
+    private decimal Total => lineas.Sum(l => l.Subtotal ?? 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is null)
+        {
+            return;
+        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socio = await db.Socios.AsNoTracking().FirstOrDefaultAsync(s => s.Id == socioId);
+
+            articulos = await db.Articulos
+                .AsNoTracking()
+                .Where(a => a.Activo == true)
+                .OrderBy(a => a.Descripcion)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void AnadirProducto()
+    {
+        if (!long.TryParse(articuloSeleccionadoId, out var articuloId))
+        {
+            return;
+        }
+
+        var articulo = articulos.FirstOrDefault(a => a.Id == articuloId);
+        if (articulo is null)
+        {
+            return;
+        }
+
+        var existente = lineas.FirstOrDefault(l => l.ArticuloId == articuloId);
+        if (existente is not null)
+        {
+            CambiarCantidad(existente, 1);
+            return;
+        }
+
+        lineas.Add(new TicketLinea
+        {
+            ArticuloId = articulo.Id,
+            Articulo = articulo,
+            PrecioUnidad = articulo.PrecioUnidad,
+            Unidades = 1,
+            Subtotal = articulo.PrecioUnidad,
+        });
+
+        error = null;
+    }
+
+    private void CambiarCantidad(TicketLinea linea, int delta)
+    {
+        var nuevasUnidades = (linea.Unidades ?? 1) + delta;
+        if (nuevasUnidades < 1)
+        {
+            return;
+        }
+
+        linea.Unidades = nuevasUnidades;
+        linea.Subtotal = (linea.PrecioUnidad ?? 0) * nuevasUnidades;
+    }
+
+    private void EliminarLinea(TicketLinea linea) => lineas.Remove(linea);
+
+    private async Task Guardar()
+    {
+        if (socioId is null || lineas.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var ticket = new Ticket
+            {
+                Fecha = DateTime.SpecifyKind(fecha, DateTimeKind.Unspecified),
+                SocioId = socioId,
+                ImporteTotal = Total,
+                Revisado = false,
+            };
+
+            foreach (var linea in lineas)
+            {
+                ticket.Lineas.Add(new TicketLinea
+                {
+                    ArticuloId = linea.ArticuloId,
+                    PrecioUnidad = linea.PrecioUnidad,
+                    Unidades = linea.Unidades,
+                    Subtotal = linea.Subtotal,
+                });
+            }
+
+            db.Tickets.Add(ticket);
+            await db.SaveChangesAsync();
+
+            Navegacion.NavigateTo("/inicio");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Eliminar() => Navegacion.NavigateTo("/inicio");
+}
