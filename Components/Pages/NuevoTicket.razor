@@ -17,6 +17,10 @@ else
             <h1 class="mb-0">Nuevo ticket</h1>
             <div class="text-muted">@socio.Nombre @socio.Apellidos · @fecha.ToString("dd/MM/yyyy HH:mm")</div>
         </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="Guardar">Guardar</button>
+            <button type="button" class="btn btn-outline-danger" @onclick="Eliminar">Cancelar</button>
+        </div>
     </div>
 
     @if (error is not null)
@@ -28,15 +32,15 @@ else
         <div class="card-body">
             <label class="form-label">Añadir producto</label>
             <div class="d-flex flex-wrap gap-2">
-                <input class="form-control" style="max-width: 220px;" placeholder="Buscar producto (ej. cer)"
+                <input class="form-control" style="max-width: 320px;" list="listaArticulos"
+                       placeholder="Escribe o elige un producto (ej. cer)"
                        @bind="filtro" @bind:event="oninput" />
-                <select class="form-select" style="max-width: 320px;" @bind="articuloSeleccionadoId">
-                    <option value="">-- selecciona --</option>
-                    @foreach (var a in ArticulosFiltrados)
+                <datalist id="listaArticulos">
+                    @foreach (var a in articulos)
                     {
-                        <option value="@a.Id">@a.Descripcion (@a.PrecioUnidad.ToString("0.00")€)</option>
+                        <option value="@Etiqueta(a)"></option>
                     }
-                </select>
+                </datalist>
                 <button type="button" class="btn btn-pena" @onclick="AnadirProducto">+</button>
             </div>
         </div>
@@ -90,10 +94,6 @@ else
         </div>
     }
 
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="Guardar">Guardar</button>
-        <button type="button" class="btn btn-outline-danger" @onclick="Eliminar">Eliminar</button>
-    </div>
 }
 
 @code {
@@ -106,18 +106,14 @@ else
 
     private List<Articulo> articulos = new();
     private string filtro = string.Empty;
-    private string articuloSeleccionadoId = string.Empty;
 
     private List<TicketLinea> lineas = new();
 
     private string? error;
 
-    private IEnumerable<Articulo> ArticulosFiltrados =>
-        string.IsNullOrWhiteSpace(filtro)
-            ? articulos
-            : articulos.Where(a => a.Descripcion.Contains(filtro, StringComparison.OrdinalIgnoreCase));
-
     private decimal Total => lineas.Sum(l => l.Subtotal ?? 0);
+
+    private static string Etiqueta(Articulo a) => $"{a.Descripcion} ({a.PrecioUnidad.ToString("0.00")}€)";
 
     protected override async Task OnInitializedAsync()
     {
@@ -142,7 +138,7 @@ else
 
             articulos = await db.Articulos
                 .AsNoTracking()
-                .Where(a => a.Activo == true)
+                .Where(a => a.Activo != false)
                 .OrderBy(a => a.Descripcion)
                 .ToListAsync();
         }
@@ -154,33 +150,51 @@ else
 
     private void AnadirProducto()
     {
-        if (!long.TryParse(articuloSeleccionadoId, out var articuloId))
+        if (string.IsNullOrWhiteSpace(filtro))
         {
             return;
         }
 
-        var articulo = articulos.FirstOrDefault(a => a.Id == articuloId);
+        var texto = filtro.Trim();
+
+        var articulo = articulos.FirstOrDefault(a => Etiqueta(a).Equals(texto, StringComparison.OrdinalIgnoreCase));
+
         if (articulo is null)
         {
+            var candidatos = articulos
+                .Where(a => a.Descripcion.Contains(texto, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (candidatos.Count == 1)
+            {
+                articulo = candidatos[0];
+            }
+        }
+
+        if (articulo is null)
+        {
+            error = "Selecciona un producto de la lista.";
             return;
         }
 
-        var existente = lineas.FirstOrDefault(l => l.ArticuloId == articuloId);
+        var existente = lineas.FirstOrDefault(l => l.ArticuloId == articulo.Id);
         if (existente is not null)
         {
             CambiarCantidad(existente, 1);
-            return;
+        }
+        else
+        {
+            lineas.Add(new TicketLinea
+            {
+                ArticuloId = articulo.Id,
+                Articulo = articulo,
+                PrecioUnidad = articulo.PrecioUnidad,
+                Unidades = 1,
+                Subtotal = articulo.PrecioUnidad,
+            });
         }
 
-        lineas.Add(new TicketLinea
-        {
-            ArticuloId = articulo.Id,
-            Articulo = articulo,
-            PrecioUnidad = articulo.PrecioUnidad,
-            Unidades = 1,
-            Subtotal = articulo.PrecioUnidad,
-        });
-
+        filtro = string.Empty;
         error = null;
     }
 
