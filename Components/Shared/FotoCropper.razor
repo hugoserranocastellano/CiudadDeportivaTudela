@@ -13,28 +13,30 @@
         </div>
     }
 
-    @if (recortando)
-    {
-        <div class="card mb-2" style="max-width: 320px;">
-            <div class="card-body text-center">
-                <canvas id="@canvasId" width="300" height="300" class="rounded border" style="touch-action:none; cursor:move;"></canvas>
-                <div class="d-flex justify-content-center gap-2 mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(-1)">−</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(1)">+</button>
-                </div>
-                <div class="d-flex justify-content-center gap-2 mt-2">
-                    <button type="button" class="btn btn-sm btn-pena" @onclick="Confirmar" disabled="@subiendo">
-                        @(subiendo ? "Subiendo..." : "Usar esta foto")
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancelar" disabled="@subiendo">Cancelar</button>
-                </div>
+    @* El input y el panel de recorte se quedan siempre en el DOM (solo se
+       ocultan con CSS): si Blazor los quita/pone con @if, el ElementReference
+       del input queda apuntando a un nodo ya destruido justo cuando el JS
+       intenta leer el fichero, y falla con "no se ha seleccionado ningún
+       fichero" aunque sí se haya elegido uno. *@
+    <div hidden="@recortando">
+        <InputFile @ref="inputFile" class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@Disabled" />
+    </div>
+
+    <div hidden="@(!recortando)" class="card mb-2" style="max-width: 320px;">
+        <div class="card-body text-center">
+            <canvas id="@canvasId" width="300" height="300" class="rounded border" style="touch-action:none; cursor:move;"></canvas>
+            <div class="d-flex justify-content-center gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(-1)">−</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(1)">+</button>
+            </div>
+            <div class="d-flex justify-content-center gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-pena" @onclick="Confirmar" disabled="@subiendo">
+                    @(subiendo ? "Subiendo..." : "Usar esta foto")
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="Cancelar" disabled="@subiendo">Cancelar</button>
             </div>
         </div>
-    }
-    else
-    {
-        <InputFile @ref="inputFile" class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@Disabled" />
-    }
+    </div>
 
     @if (error is not null)
     {
@@ -85,9 +87,6 @@
         {
             recortando = true;
             StateHasChanged();
-            // El canvas todavía no existe en el DOM hasta que Blazor renderiza
-            // el bloque "recortando"; se espera un ciclo antes de cargar la imagen.
-            await Task.Yield();
 
             var js = await ModuloAsync();
             // La foto se lee directamente en el navegador (FileReader sobre el
