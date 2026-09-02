@@ -29,7 +29,7 @@ else if (tickets.Count == 0)
 else
 {
     <p class="text-muted">
-        @tickets.Count ticket(s), @(tickets.Sum(t => t.ImporteTotal ?? 0).ToString("N2")) € en total.
+        @tickets.Count ticket(s), @(tickets.Where(t => t.Estado == "pagado").Sum(t => t.ImporteTotal ?? 0).ToString("N2")) € pagados en total.
     </p>
 
     <div class="table-responsive tabla-marco">
@@ -39,7 +39,7 @@ else
                     <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
                     <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
                     <th class="text-end" role="button" @onclick='() => Ordenar("importe")'>Importe@(Flecha("importe"))</th>
-                    <th role="button" @onclick='() => Ordenar("revisado")'>Revisado@(Flecha("revisado"))</th>
+                    <th role="button" @onclick='() => Ordenar("estado")'>Estado@(Flecha("estado"))</th>
                     <th role="button" @onclick='() => Ordenar("lineas")'>Líneas@(Flecha("lineas"))</th>
                     <th>Foto</th>
                 </tr>
@@ -47,21 +47,41 @@ else
             <tbody>
                 @foreach (var ticket in Ordenados)
                 {
-                    <tr role="button" class="@(ticketSeleccionado == ticket.Id ? "table-primary fw-semibold" : null)"
-                        style="@(ticketSeleccionado == ticket.Id ? "border-left: 4px solid var(--bs-primary);" : null)"
-                        @onclick="() => Seleccionar(ticket.Id)">
-                        <td>@ticket.Id</td>
-                        <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
-                        <td class="text-end">@ticket.ImporteTotal?.ToString("0.00")€</td>
-                        <td>@(ticket.Revisado == true ? "Sí" : "No")</td>
-                        <td>@ticket.NumeroLineas</td>
-                        <td>
-                            @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
-                            {
-                                <a href="@ticket.UrlFotoTicket" target="_blank" rel="noopener" @onclick:stopPropagation="true">Ver</a>
-                            }
-                        </td>
-                    </tr>
+                    @if (ticket.Estado == "abierto")
+                    {
+                        <tr>
+                            <td>@ticket.Id</td>
+                            <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">@ticket.ImporteTotal?.ToString("0.00")€</td>
+                            <td><span class="badge text-bg-warning">Abierto</span></td>
+                            <td>@ticket.NumeroLineas</td>
+                            <td><a class="btn btn-sm btn-pena" href="tickets/nuevo">Continuar</a></td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr role="button" class="@(ticketSeleccionado == ticket.Id ? "table-primary fw-semibold" : null)"
+                            style="@(ticketSeleccionado == ticket.Id ? "border-left: 4px solid var(--bs-primary);" : null)"
+                            @onclick="() => Seleccionar(ticket.Id)">
+                            <td>@ticket.Id</td>
+                            <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">@ticket.ImporteTotal?.ToString("0.00")€</td>
+                            <td>
+                                <span class="badge text-bg-success">Pagado</span>
+                                @if (!string.IsNullOrWhiteSpace(ticket.FormaPago))
+                                {
+                                    <span class="text-muted small">(@ticket.FormaPago)</span>
+                                }
+                            </td>
+                            <td>@ticket.NumeroLineas</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
+                                {
+                                    <a href="@ticket.UrlFotoTicket" target="_blank" rel="noopener" @onclick:stopPropagation="true">Ver</a>
+                                }
+                            </td>
+                        </tr>
+                    }
                     @if (ticketSeleccionado == ticket.Id)
                     {
                         <tr>
@@ -140,7 +160,7 @@ else
             {
                 "id" => t => t.Id,
                 "importe" => t => t.ImporteTotal,
-                "revisado" => t => t.Revisado,
+                "estado" => t => t.Estado,
                 "lineas" => t => t.NumeroLineas,
                 _ => t => t.Fecha,
             };
@@ -202,7 +222,8 @@ else
                     t.Id,
                     t.Fecha,
                     t.ImporteTotal,
-                    t.Revisado,
+                    t.Estado,
+                    t.FormaPago,
                     t.UrlFotoTicket,
                     t.Lineas.Count))
                 .ToListAsync();
@@ -266,7 +287,8 @@ else
         long Id,
         DateTime? Fecha,
         decimal? ImporteTotal,
-        bool? Revisado,
+        string Estado,
+        string? FormaPago,
         string? UrlFotoTicket,
         int NumeroLineas);
 

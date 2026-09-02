@@ -14,6 +14,12 @@ public class Ticket
 
     public string? UrlFotoTicket { get; set; }
 
+    // "abierto" = borrador en curso (se puede recuperar y seguir editando),
+    // "pagado" = cerrado tras pasar por el flujo de pago.
+    public string Estado { get; set; } = "abierto";
+
+    public string? FormaPago { get; set; }
+
     public DateTime? CreatedAt { get; set; }
 
     public Socio? Socio { get; set; }

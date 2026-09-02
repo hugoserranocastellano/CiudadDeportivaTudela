@@ -187,6 +187,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.ImporteTotal).HasColumnName("importe_total").HasColumnType("numeric(10,2)");
             entity.Property(e => e.Revisado).HasColumnName("revisado");
             entity.Property(e => e.UrlFotoTicket).HasColumnName("url_foto_ticket");
+            entity.Property(e => e.Estado).HasColumnName("estado").HasDefaultValue("abierto");
+            entity.Property(e => e.FormaPago).HasColumnName("forma_pago");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
 
             entity.HasOne(e => e.Socio)

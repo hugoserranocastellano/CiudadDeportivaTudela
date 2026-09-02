@@ -1,10 +1,19 @@
 @page "/tickets/nuevo"
 @rendermode InteractiveServer
 @attribute [Authorize]
+@implements IAsyncDisposable
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager Navegacion
+@inject IJSRuntime JS
 
 <PageTitle>Nuevo ticket · Peña Ciudad Deportiva</PageTitle>
+
+@* Mientras haya líneas sin pagar, se avisa antes de navegar a otra página de
+   la app (NavigationLock) o de cerrar/recargar la pestaña (JS beforeunload
+   en wwwroot/js/avisoSalida.js) — aunque el ticket ya está autoguardado
+   desde la primera línea y se puede retomar luego, es un aviso extra para
+   que no parezca que se pierde algo. *@
+<NavigationLock OnBeforeInternalNavigation="ConfirmarSalida" />
 
 @if (socio is null)
 {
@@ -18,8 +27,8 @@ else
             <div class="text-muted">@socio.Nombre @socio.Apellidos · @fecha.ToString("dd/MM/yyyy HH:mm")</div>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="Guardar">Guardar</button>
-            <button type="button" class="btn btn-outline-danger" @onclick="Eliminar">Cancelar</button>
+            <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="AbrirPago">Pagar</button>
+            <button type="button" class="btn btn-outline-danger" @onclick="Cancelar">Cancelar</button>
         </div>
     </div>
 
@@ -33,6 +42,51 @@ else
         <div class="alert alert-success py-2 text-center shadow"
              style="position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); z-index:1050; max-width:90vw;">
             @mensajeCatalogo
+        </div>
+    }
+
+    @if (mostrarPago)
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Pagar ticket</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => mostrarPago = false">← Volver</button>
+            </div>
+            <div class="card-body">
+                @if (errorPago is not null)
+                {
+                    <div class="alert alert-danger py-2">@errorPago</div>
+                }
+                <p>Total a pagar: <strong>@Total.ToString("0.00")€</strong></p>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6>He pagado con tarjeta (TPV)</h6>
+                                <p class="text-muted small">Sube una foto del recibo del TPV.</p>
+                                @if (ticketId is long id)
+                                {
+                                    <SubidaSimple Bucket="Tickets" Path="@id.ToString()" FotoSubida="PagarConTarjeta" Disabled="@pagando" />
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6>Pagar en metálico</h6>
+                                <p class="text-muted small">
+                                    Apunta este número en el sobre: <strong class="fs-5">#@ticketId</strong>
+                                </p>
+                                <button type="button" class="btn btn-pena" disabled="@pagando" @onclick="PagarEnEfectivo">
+                                    @(pagando ? "Confirmando..." : "Confirmar pago en efectivo")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 
@@ -71,7 +125,7 @@ else
                 <div class="row row-cols-2 row-cols-md-4 g-3">
                     @foreach (var a in articulos)
                     {
-                        <div class="col text-center" role="button" style="cursor:pointer" @ondblclick="() => _ = AnadirDesdeCatalogo(a)">
+                        <div class="col text-center" role="button" style="cursor:pointer" @ondblclick="() => AnadirDesdeCatalogo(a)">
                             @if (!string.IsNullOrWhiteSpace(a.UrlFoto))
                             {
                                 <img src="@a.UrlFoto" alt="@a.Descripcion" style="width:100%;max-width:100px;height:100px;object-fit:cover;" class="rounded" />
@@ -153,6 +207,7 @@ else
     private long? socioId;
     private Socio? socio;
     private DateTime fecha = DateTime.Now;
+    private long? ticketId;
 
     private List<Articulo> articulos = new();
     private string filtro = string.Empty;
@@ -167,6 +222,11 @@ else
     private List<TicketLinea> lineas = new();
 
     private string? error;
+    private bool mostrarPago;
+    private bool pagando;
+    private string? errorPago;
+
+    private IJSObjectReference? moduloAviso;
 
     private decimal Total => lineas.Sum(l => l.Subtotal ?? 0);
 
@@ -198,10 +258,64 @@ else
                 .Where(a => a.Activo != false)
                 .OrderBy(a => a.Descripcion)
                 .ToListAsync();
+
+            // Si el socio ya tenía un ticket a medias (salió sin pagar), se
+            // retoma en vez de empezar en blanco.
+            var abierto = await db.Tickets
+                .AsNoTracking()
+                .Include(t => t.Lineas).ThenInclude(l => l.Articulo)
+                .Where(t => t.SocioId == socioId && t.Estado == "abierto")
+                .OrderByDescending(t => t.Id)
+                .FirstOrDefaultAsync();
+
+            if (abierto is not null)
+            {
+                ticketId = abierto.Id;
+                fecha = abierto.Fecha ?? DateTime.Now;
+                lineas = abierto.Lineas.ToList();
+            }
         }
         catch (Exception ex)
         {
             error = ex.Message;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Llamar a JS interop desde OnInitializedAsync puede fallar durante el
+        // prerenderizado; se espera a que el circuito esté vivo de verdad.
+        if (firstRender && lineas.Count > 0)
+        {
+            await ActualizarAvisoSalida();
+        }
+    }
+
+    private async Task<IJSObjectReference> ModuloAvisoAsync()
+    {
+        moduloAviso ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/avisoSalida.js");
+        return moduloAviso;
+    }
+
+    private async Task ActualizarAvisoSalida()
+    {
+        var js = await ModuloAvisoAsync();
+        await js.InvokeVoidAsync(lineas.Count > 0 ? "activar" : "desactivar");
+    }
+
+    private async Task ConfirmarSalida(LocationChangingContext context)
+    {
+        if (lineas.Count == 0)
+        {
+            return;
+        }
+
+        var continuar = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Tienes un ticket sin pagar. Queda guardado y puedes continuarlo luego desde \"Mis tickets\", pero ¿seguro que quieres salir ahora?");
+        if (!continuar)
+        {
+            context.PreventNavigation();
         }
     }
 
@@ -223,7 +337,7 @@ else
             return;
         }
 
-        Anadir(articulo);
+        _ = AnadirYGuardar(articulo);
         filtro = string.Empty;
         error = null;
     }
@@ -234,7 +348,7 @@ else
 
     private async Task AnadirDesdeCatalogo(Articulo articulo)
     {
-        Anadir(articulo);
+        await AnadirYGuardar(articulo);
         mensajeCatalogo = $"«{articulo.Descripcion}» añadido.";
 
         var token = ++tokenMensajeCatalogo;
@@ -248,12 +362,19 @@ else
         }
     }
 
+    private async Task AnadirYGuardar(Articulo articulo)
+    {
+        Anadir(articulo);
+        await PersistirAsync();
+    }
+
     private void Anadir(Articulo articulo)
     {
         var existente = lineas.FirstOrDefault(l => l.ArticuloId == articulo.Id);
         if (existente is not null)
         {
-            CambiarCantidad(existente, 1);
+            existente.Unidades = (existente.Unidades ?? 1) + 1;
+            existente.Subtotal = (existente.PrecioUnidad ?? 0) * existente.Unidades;
         }
         else
         {
@@ -268,7 +389,7 @@ else
         }
     }
 
-    private void CambiarCantidad(TicketLinea linea, int delta)
+    private async Task CambiarCantidad(TicketLinea linea, int delta)
     {
         var nuevasUnidades = (linea.Unidades ?? 1) + delta;
         if (nuevasUnidades < 1)
@@ -278,13 +399,24 @@ else
 
         linea.Unidades = nuevasUnidades;
         linea.Subtotal = (linea.PrecioUnidad ?? 0) * nuevasUnidades;
+        await PersistirAsync();
     }
 
-    private void EliminarLinea(TicketLinea linea) => lineas.Remove(linea);
-
-    private async Task Guardar()
+    private async Task EliminarLinea(TicketLinea linea)
     {
-        if (socioId is null || lineas.Count == 0)
+        lineas.Remove(linea);
+        await PersistirAsync();
+    }
+
+    /// <summary>
+    /// Crea el ticket en cuanto tiene la primera línea, y en cada cambio
+    /// posterior reemplaza sus líneas por las actuales (borrar+reinsertar es
+    /// más simple y fiable que rastrear altas/bajas individuales una a una).
+    /// Así el ticket queda recuperable si el socio sale sin pagar.
+    /// </summary>
+    private async Task PersistirAsync()
+    {
+        if (socioId is null)
         {
             return;
         }
@@ -293,29 +425,44 @@ else
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            var ticket = new Ticket
+            if (ticketId is null)
             {
-                Fecha = fecha.ToUniversalTime(),
-                SocioId = socioId,
-                ImporteTotal = Total,
-                Revisado = false,
-            };
+                if (lineas.Count == 0)
+                {
+                    return;
+                }
 
+                var nuevo = new Ticket
+                {
+                    Fecha = fecha.ToUniversalTime(),
+                    SocioId = socioId,
+                    Estado = "abierto",
+                    ImporteTotal = Total,
+                };
+                db.Tickets.Add(nuevo);
+                await db.SaveChangesAsync();
+                ticketId = nuevo.Id;
+            }
+
+            await db.TicketLineas.Where(l => l.TicketId == ticketId).ExecuteDeleteAsync();
             foreach (var linea in lineas)
             {
-                ticket.Lineas.Add(new TicketLinea
+                db.TicketLineas.Add(new TicketLinea
                 {
+                    TicketId = ticketId,
                     ArticuloId = linea.ArticuloId,
                     PrecioUnidad = linea.PrecioUnidad,
                     Unidades = linea.Unidades,
                     Subtotal = linea.Subtotal,
                 });
             }
-
-            db.Tickets.Add(ticket);
             await db.SaveChangesAsync();
 
-            Navegacion.NavigateTo("/inicio");
+            await db.Tickets.Where(t => t.Id == ticketId)
+                .ExecuteUpdateAsync(t => t.SetProperty(x => x.ImporteTotal, Total));
+
+            error = null;
+            await ActualizarAvisoSalida();
         }
         catch (Exception ex)
         {
@@ -323,5 +470,100 @@ else
         }
     }
 
-    private void Eliminar() => Navegacion.NavigateTo("/inicio");
+    private void AbrirPago()
+    {
+        mostrarPago = true;
+        errorPago = null;
+    }
+
+    private async Task PagarConTarjeta(string urlRecibo)
+    {
+        await FinalizarPago("tarjeta", urlRecibo);
+    }
+
+    private async Task PagarEnEfectivo()
+    {
+        await FinalizarPago("efectivo", null);
+    }
+
+    private async Task FinalizarPago(string formaPago, string? urlRecibo)
+    {
+        if (ticketId is null)
+        {
+            return;
+        }
+
+        pagando = true;
+        errorPago = null;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (urlRecibo is not null)
+            {
+                await db.Tickets.Where(t => t.Id == ticketId).ExecuteUpdateAsync(t => t
+                    .SetProperty(x => x.Estado, "pagado")
+                    .SetProperty(x => x.FormaPago, formaPago)
+                    .SetProperty(x => x.UrlFotoTicket, urlRecibo));
+            }
+            else
+            {
+                await db.Tickets.Where(t => t.Id == ticketId).ExecuteUpdateAsync(t => t
+                    .SetProperty(x => x.Estado, "pagado")
+                    .SetProperty(x => x.FormaPago, formaPago));
+            }
+
+            await (await ModuloAvisoAsync()).InvokeVoidAsync("desactivar");
+            Navegacion.NavigateTo("/mis-tickets");
+        }
+        catch (Exception ex)
+        {
+            errorPago = ex.InnerException?.Message ?? ex.Message;
+        }
+        finally
+        {
+            pagando = false;
+        }
+    }
+
+    private async Task Cancelar()
+    {
+        if (ticketId is long id)
+        {
+            try
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+                // Las líneas caen en cascada al borrar el ticket.
+                await db.Tickets.Where(t => t.Id == id).ExecuteDeleteAsync();
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return;
+            }
+        }
+
+        if (moduloAviso is not null)
+        {
+            await moduloAviso.InvokeVoidAsync("desactivar");
+        }
+
+        Navegacion.NavigateTo("/inicio");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (moduloAviso is not null)
+        {
+            try
+            {
+                await moduloAviso.InvokeVoidAsync("desactivar");
+                await moduloAviso.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // El circuito ya se cerró; nada que limpiar.
+            }
+        }
+    }
 }

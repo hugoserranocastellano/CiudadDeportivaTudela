@@ -84,6 +84,7 @@ else
                     <th class="text-end" style="width:80px" role="button" @onclick='() => Ordenar("lineas")'>Líneas@(Flecha("lineas"))</th>
                     <th class="text-end" style="width:110px" role="button" @onclick='() => Ordenar("importe")'>Importe@(Flecha("importe"))</th>
                     <th style="width:90px" role="button" @onclick='() => Ordenar("revisado")'>Revisado@(Flecha("revisado"))</th>
+                    <th style="width:110px" role="button" @onclick='() => Ordenar("estado")'>Estado@(Flecha("estado"))</th>
                     <th style="width:70px">Foto</th>
                     <th class="text-end" style="width:150px">Acciones</th>
                 </tr>
@@ -98,6 +99,20 @@ else
                         <td class="text-end">@ticket.NumeroLineas</td>
                         <td class="text-end">@((ticket.ImporteTotal ?? 0).ToString("N2")) €</td>
                         <td>@(ticket.Revisado == true ? "Sí" : "No")</td>
+                        <td>
+                            @if (ticket.Estado == "abierto")
+                            {
+                                <span class="badge text-bg-warning">Abierto</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Pagado</span>
+                                @if (!string.IsNullOrWhiteSpace(ticket.FormaPago))
+                                {
+                                    <div class="text-muted small">@ticket.FormaPago</div>
+                                }
+                            }
+                        </td>
                         <td>
                             @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
                             {
@@ -155,6 +170,7 @@ else
                 "lineas" => t => t.NumeroLineas,
                 "importe" => t => t.ImporteTotal,
                 "revisado" => t => t.Revisado,
+                "estado" => t => t.Estado,
                 _ => t => t.Fecha,
             };
 
@@ -210,6 +226,8 @@ else
                     t.SocioId,
                     t.ImporteTotal,
                     t.Revisado,
+                    t.Estado,
+                    t.FormaPago,
                     t.UrlFotoTicket,
                     t.Lineas.Count))
                 .ToListAsync();
@@ -316,6 +334,8 @@ else
         long? SocioId,
         decimal? ImporteTotal,
         bool? Revisado,
+        string Estado,
+        string? FormaPago,
         string? UrlFotoTicket,
         int NumeroLineas);
 

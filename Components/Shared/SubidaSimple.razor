@@ -1,0 +1,61 @@
+@* Selector de foto sin recorte, para adjuntar fotos alargadas o con texto
+   (recibos, tickets de TPV) donde forzar un cuadrado cortaría contenido.
+   A diferencia de FotoCropper, sube la imagen tal cual la elige el socio. *@
+@inject SupabaseStorageService Storage
+
+<div>
+    <InputFile class="form-control" OnChange="ElegirArchivo" accept="image/*" disabled="@(Disabled || subiendo)" />
+    @if (subiendo)
+    {
+        <div class="form-text">Subiendo...</div>
+    }
+    @if (error is not null)
+    {
+        <div class="text-danger small mt-1">@error</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Bucket { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Path { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<string> FotoSubida { get; set; }
+
+    private bool subiendo;
+    private string? error;
+
+    private async Task ElegirArchivo(InputFileChangeEventArgs e)
+    {
+        error = null;
+        subiendo = true;
+        try
+        {
+            var archivo = e.File;
+            var extension = System.IO.Path.GetExtension(archivo.Name);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".jpg";
+            }
+
+            await using var stream = archivo.OpenReadStream(maxAllowedSize: 8 * 1024 * 1024);
+            var url = await Storage.SubirAsync(Bucket, $"{Path}{extension}", stream, archivo.ContentType);
+
+            await FotoSubida.InvokeAsync(url);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            subiendo = false;
+        }
+    }
+}
