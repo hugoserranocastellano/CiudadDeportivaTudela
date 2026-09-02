@@ -6,7 +6,8 @@
 
 <PageTitle>Reservas</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
     <h1 class="mb-0">Reservas</h1>
 </div>
 
@@ -14,6 +15,10 @@
 {
     <div class="alert alert-danger" role="alert"><code>@error</code></div>
 }
+
+<p class="text-muted small">
+    Periodo abierto del @hoy.ToString("dd/MM/yyyy") al @limiteMax.ToString("dd/MM/yyyy").
+</p>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Mes anterior</button>
@@ -106,6 +111,13 @@ else
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold">@r.SocioNombre</div>
                                     <div class="small text-muted">@r.Comensales comensal(es) · @(r.Mesas.Count == 0 ? "sin mesa" : string.Join(", ", r.Mesas))</div>
+                                    <div class="small text-muted">
+                                        Limpieza: @(r.Limpieza == true ? "sí" : "no")
+                                        @if (!string.IsNullOrWhiteSpace(r.SocioTelefono))
+                                        {
+                                            <text> · Tfno: @r.SocioTelefono</text>
+                                        }
+                                    </div>
                                 </div>
                                 @if (esJunta || r.SocioId == socioId)
                                 {
@@ -185,7 +197,11 @@ else
                                     <div class="d-flex flex-wrap gap-3">
                                         @foreach (var mesa in mesasDisponibles)
                                         {
-                                            <div class="form-check">
+                                            <div class="form-check d-flex align-items-center gap-2">
+                                                @if (!string.IsNullOrWhiteSpace(mesa.UrlFotoMesa))
+                                                {
+                                                    <img src="@mesa.UrlFotoMesa" alt="@mesa.Descripcion" style="width:32px;height:32px;object-fit:cover;" class="rounded" />
+                                                }
                                                 <input class="form-check-input" type="checkbox" id="@("mesa" + mesa.Id)"
                                                        checked="@mesasSeleccionadas.Contains(mesa.Id)"
                                                        @onchange="@(e => AlternarMesa(mesa.Id, (bool)e.Value!))" />
@@ -460,7 +476,9 @@ else
                     r.Socio != null ? $"{r.Socio.Nombre} {r.Socio.Apellidos}".Trim() : "(sin socio)",
                     r.Socio != null ? r.Socio.UrlFoto : null,
                     r.Comensales ?? 0,
-                    r.ReservaMesas.Select(rm => rm.Mesa!.Descripcion).ToList()))
+                    r.ReservaMesas.Select(rm => rm.Mesa!.Descripcion).ToList(),
+                    r.Limpieza,
+                    r.Socio != null ? r.Socio.Telefono : null))
                 .ToListAsync();
 
             error = null;
@@ -647,5 +665,7 @@ else
 
     private record Opcion(long Id, string Texto);
 
-    private record ReservaFila(long Id, long? SocioId, string TipoReservaDescripcion, string SocioNombre, string? SocioFoto, int Comensales, List<string> Mesas);
+    private record ReservaFila(
+        long Id, long? SocioId, string TipoReservaDescripcion, string SocioNombre, string? SocioFoto,
+        int Comensales, List<string> Mesas, bool? Limpieza, string? SocioTelefono);
 }

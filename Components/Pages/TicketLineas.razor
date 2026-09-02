@@ -76,21 +76,21 @@ else
 {
     <p class="text-muted">@lineas.Count línea(s), @(lineas.Sum(l => l.Subtotal ?? 0).ToString("N2")) € en total.</p>
 
-    <div class="table-responsive">
+    <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Ticket</th>
-                    <th>Artículo</th>
-                    <th class="text-end">Precio</th>
-                    <th class="text-end">Unidades</th>
-                    <th class="text-end">Subtotal</th>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("ticket")'>Ticket@(Flecha("ticket"))</th>
+                    <th role="button" @onclick='() => Ordenar("articulo")'>Artículo@(Flecha("articulo"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("precio")'>Precio@(Flecha("precio"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("unidades")'>Unidades@(Flecha("unidades"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("subtotal")'>Subtotal@(Flecha("subtotal"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var linea in lineas)
+                @foreach (var linea in Ordenados)
                 {
                     <tr>
                         <td>@linea.Id</td>
@@ -134,6 +134,52 @@ else
 
     private static string Texto(Dictionary<long, string> indice, long? id) =>
         id is not null && indice.TryGetValue(id.Value, out var texto) ? texto : "—";
+
+    private string ordenCampo = "id";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (lineas is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "ticket" => l => Texto(ticketsPorId, l.TicketId),
+                "articulo" => l => Texto(articulosPorId, l.ArticuloId),
+                "precio" => l => l.PrecioUnidad,
+                "unidades" => l => l.Unidades,
+                "subtotal" => l => l.Subtotal,
+                _ => l => l.Id,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? lineas.OrderByDescending(clave)
+                : lineas.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override Task OnInitializedAsync() => Cargar();
 

@@ -73,21 +73,21 @@ else
         @(sugerencias.Count(s => string.IsNullOrWhiteSpace(s.Respuesta))) sin responder.
     </p>
 
-    <div class="table-responsive">
+    <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Fecha</th>
-                    <th>Socio</th>
-                    <th>Sugerencia</th>
-                    <th>Respuesta</th>
-                    <th>Visible</th>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("socio")'>Socio@(Flecha("socio"))</th>
+                    <th role="button" @onclick='() => Ordenar("sugerencia")'>Sugerencia@(Flecha("sugerencia"))</th>
+                    <th role="button" @onclick='() => Ordenar("respuesta")'>Respuesta@(Flecha("respuesta"))</th>
+                    <th role="button" @onclick='() => Ordenar("visible")'>Visible@(Flecha("visible"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var sugerencia in sugerencias)
+                @foreach (var sugerencia in Ordenados)
                 {
                     <tr class="@(string.IsNullOrWhiteSpace(sugerencia.Respuesta) ? "table-warning" : null)">
                         <td>@sugerencia.Id</td>
@@ -134,6 +134,52 @@ else
 
     private string NombreSocio(long? id) =>
         id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "Anónima";
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (sugerencias is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => s => s.Id,
+                "socio" => s => NombreSocio(s.SocioId),
+                "sugerencia" => s => s.Descripcion,
+                "respuesta" => s => s.Respuesta,
+                "visible" => s => s.Visible,
+                _ => s => s.Fecha,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? sugerencias.OrderByDescending(clave)
+                : sugerencias.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override Task OnInitializedAsync() => Cargar();
 

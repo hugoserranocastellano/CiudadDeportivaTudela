@@ -24,19 +24,19 @@ else if (inscripciones.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>Evento</th>
-                    <th>Fecha</th>
-                    <th>Acude</th>
-                    <th>Lista de espera</th>
-                    <th>Inscripción</th>
+                    <th role="button" @onclick='() => Ordenar("evento")'>Evento@(Flecha("evento"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("acude")'>Acude@(Flecha("acude"))</th>
+                    <th role="button" @onclick='() => Ordenar("espera")'>Lista de espera@(Flecha("espera"))</th>
+                    <th role="button" @onclick='() => Ordenar("inscripcion")'>Inscripción@(Flecha("inscripcion"))</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var inscripcion in inscripciones)
+                @foreach (var inscripcion in Ordenadas)
                 {
                     <tr class="@(inscripcion.ListaEspera == true ? "table-warning" : null)">
                         <td>@DescripcionEvento(inscripcion.EventoId)</td>
@@ -65,6 +65,51 @@ else
 
     private DateTime? FechaEvento(long? id) =>
         id is not null && eventos.TryGetValue(id.Value, out var evento) ? evento.Fecha : null;
+
+    private string ordenCampo = "inscripcion";
+    private bool ordenDescendente = true;
+
+    private List<EventoInscripcion> Ordenadas
+    {
+        get
+        {
+            if (inscripciones is null)
+            {
+                return new List<EventoInscripcion>();
+            }
+
+            Func<EventoInscripcion, object?> clave = ordenCampo switch
+            {
+                "evento" => i => DescripcionEvento(i.EventoId),
+                "fecha" => i => FechaEvento(i.EventoId),
+                "acude" => i => i.Acude,
+                "espera" => i => i.ListaEspera,
+                _ => i => i.FechaInscripcion,
+            };
+
+            IEnumerable<EventoInscripcion> resultado = ordenDescendente
+                ? inscripciones.OrderByDescending(clave)
+                : inscripciones.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override async Task OnInitializedAsync()
     {

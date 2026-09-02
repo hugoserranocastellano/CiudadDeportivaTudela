@@ -48,8 +48,16 @@
                     <InputNumber class="form-control" @bind-Value="edicion.StockMinimo" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">URL de la foto</label>
-                    <InputText class="form-control" @bind-Value="edicion.UrlFoto" />
+                    <label class="form-label">Foto</label>
+                    @if (esNuevo)
+                    {
+                        <div class="form-text">Guarda primero el artículo para poder subir su foto.</div>
+                    }
+                    else
+                    {
+                        <FotoCropper Bucket="Articulos" Path="@edicion.Id.ToString()" FotoActualUrl="@edicion.UrlFoto"
+                                     FotoSubida="@(url => edicion.UrlFoto = url)" />
+                    }
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <div class="form-check">
@@ -79,23 +87,30 @@ else
 {
     <p class="text-muted">@articulos.Count artículo(s), @(articulos.Count(BajoMinimo)) bajo mínimo.</p>
 
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Descripción</th>
-                    <th>Proveedor</th>
-                    <th class="text-end">Precio</th>
-                    <th class="text-end">Stock</th>
-                    <th class="text-end">Mínimo</th>
-                    <th>Activo</th>
+                    <th>Foto</th>
+                    <th role="button" @onclick='() => Ordenar("descripcion")'>Descripción@(Flecha("descripcion"))</th>
+                    <th role="button" @onclick='() => Ordenar("proveedor")'>Proveedor@(Flecha("proveedor"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("precio")'>Precio@(Flecha("precio"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("stock")'>Stock@(Flecha("stock"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("minimo")'>Mínimo@(Flecha("minimo"))</th>
+                    <th role="button" @onclick='() => Ordenar("activo")'>Activo@(Flecha("activo"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var articulo in articulos)
+                @foreach (var articulo in Ordenados)
                 {
                     <tr class="@(BajoMinimo(articulo) ? "table-warning" : null)">
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(articulo.UrlFoto))
+                            {
+                                <img src="@articulo.UrlFoto" alt="@articulo.Descripcion" style="width:40px;height:40px;object-fit:cover;" class="rounded" />
+                            }
+                        </td>
                         <td>@articulo.Descripcion</td>
                         <td>@articulo.Proveedor</td>
                         <td class="text-end">@articulo.PrecioUnidad.ToString("N2") €</td>
@@ -129,7 +144,53 @@ else
     private long? idBorrando;
     private string? error;
 
+    private string ordenCampo = "descripcion";
+    private bool ordenDescendente;
+
     private static bool BajoMinimo(Articulo a) => a.StockActual <= a.StockMinimo;
+
+    private List<Articulo> Ordenados
+    {
+        get
+        {
+            if (articulos is null)
+            {
+                return new List<Articulo>();
+            }
+
+            Func<Articulo, object?> clave = ordenCampo switch
+            {
+                "proveedor" => a => a.Proveedor,
+                "precio" => a => a.PrecioUnidad,
+                "stock" => a => a.StockActual,
+                "minimo" => a => a.StockMinimo,
+                "activo" => a => a.Activo,
+                _ => a => a.Descripcion,
+            };
+
+            IEnumerable<Articulo> resultado = ordenDescendente
+                ? articulos.OrderByDescending(clave)
+                : articulos.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override Task OnInitializedAsync() => Cargar();
 

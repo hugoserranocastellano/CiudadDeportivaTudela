@@ -5,10 +5,11 @@
 
 <PageTitle>Mis tickets</PageTitle>
 
-<a class="btn btn-outline-secondary btn-sm mb-3" href="inicio">← Volver</a>
-
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Mis tickets</h1>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+        <h1 class="mb-0">Mis tickets</h1>
+    </div>
     <a class="btn btn-pena" href="tickets/nuevo">Nuevo ticket</a>
 </div>
 
@@ -27,20 +28,20 @@ else if (tickets.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle mb-0">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Fecha</th>
-                    <th class="text-end">Importe</th>
-                    <th>Revisado</th>
-                    <th>Líneas</th>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("importe")'>Importe@(Flecha("importe"))</th>
+                    <th role="button" @onclick='() => Ordenar("revisado")'>Revisado@(Flecha("revisado"))</th>
+                    <th role="button" @onclick='() => Ordenar("lineas")'>Líneas@(Flecha("lineas"))</th>
                     <th>Foto</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var ticket in tickets)
+                @foreach (var ticket in Ordenados)
                 {
                     <tr role="button" class="@(ticketSeleccionado == ticket.Id ? "table-primary fw-semibold" : null)"
                         style="@(ticketSeleccionado == ticket.Id ? "border-left: 4px solid var(--bs-primary);" : null)"
@@ -116,6 +117,51 @@ else
     private List<FilaLinea>? lineas;
     private bool lineasCargando;
     private string? error;
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (tickets is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => t => t.Id,
+                "importe" => t => t.ImporteTotal,
+                "revisado" => t => t.Revisado,
+                "lineas" => t => t.NumeroLineas,
+                _ => t => t.Fecha,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? tickets.OrderByDescending(clave)
+                : tickets.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override async Task OnInitializedAsync()
     {

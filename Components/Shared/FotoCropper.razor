@@ -9,7 +9,10 @@
     @if (!string.IsNullOrWhiteSpace(FotoActualUrl) && !recortando)
     {
         <div class="mb-2">
-            <img src="@FotoActualUrl" alt="Foto actual" style="max-height:220px" class="rounded" />
+            @* El fichero siempre se llama igual (id.jpg), así que la URL nunca
+               cambia entre subidas: sin este parámetro el navegador seguiría
+               mostrando la foto vieja cacheada tras subir una nueva. *@
+            <img src="@($"{FotoActualUrl}?v={sufijoCache}")" alt="Foto actual" style="max-height:220px" class="rounded" />
         </div>
     }
 
@@ -42,6 +45,10 @@
     {
         <div class="text-danger small mt-1">@error</div>
     }
+    @if (subida && !recortando)
+    {
+        <div class="text-success small mt-1">Foto actualizada.</div>
+    }
 </div>
 
 @code {
@@ -61,10 +68,12 @@
     public EventCallback<string> FotoSubida { get; set; }
 
     private readonly string canvasId = $"fotoCropper-{Guid.NewGuid():N}";
+    private string sufijoCache = Guid.NewGuid().ToString("N");
     private InputFile? inputFile;
     private IJSObjectReference? modulo;
     private bool recortando;
     private bool subiendo;
+    private bool subida;
     private bool cargado;
     private string? error;
 
@@ -77,6 +86,7 @@
     private async Task ElegirArchivo(InputFileChangeEventArgs e)
     {
         error = null;
+        subida = false;
 
         if (inputFile?.Element is null)
         {
@@ -135,6 +145,12 @@
             await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: 2 * 1024 * 1024);
 
             var url = await Storage.SubirAsync(Bucket, $"{Path}.jpg", stream, "image/jpeg");
+
+            // Nuevo sufijo para que la vista previa (y la de FotoActualUrl que
+            // nos vuelva a pasar el padre en el próximo render) no se quede con
+            // la copia cacheada de la foto anterior, aunque la URL sea idéntica.
+            sufijoCache = Guid.NewGuid().ToString("N");
+            subida = true;
 
             await CerrarRecorte();
             await FotoSubida.InvokeAsync(url);

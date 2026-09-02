@@ -78,6 +78,38 @@ else
                 <button type="button" class="btn btn-outline-secondary" @onclick="() => editandoDatos = false">Cancelar</button>
             </div>
         </EditForm>
+
+        <EditForm Model="datosPin" OnValidSubmit="GuardarPin" class="card mb-4">
+            <DataAnnotationsValidator />
+            <div class="card-header fw-semibold">Cambiar PIN</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">PIN actual</label>
+                        <InputText class="form-control" type="password" inputmode="numeric" maxlength="4"
+                                   @bind-Value="datosPin!.PinActual" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">PIN nuevo</label>
+                        <InputText class="form-control" type="password" inputmode="numeric" maxlength="4"
+                                   @bind-Value="datosPin!.PinNuevo" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Repite el PIN nuevo</label>
+                        <InputText class="form-control" type="password" inputmode="numeric" maxlength="4"
+                                   @bind-Value="datosPin!.PinNuevoRepetido" />
+                    </div>
+                </div>
+                @if (errorPin is not null)
+                {
+                    <div class="text-danger small mt-2">@errorPin</div>
+                }
+                <ValidationSummary class="mt-3 small" />
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-pena">Cambiar PIN</button>
+            </div>
+        </EditForm>
     }
 
     <div class="list-group mb-4">
@@ -174,6 +206,9 @@ else
     private bool editandoDatos;
     private DatosSocio? datosEdicion;
 
+    private DatosPin? datosPin;
+    private string? errorPin;
+
     private enum Accion { Ninguna, Sugerencia }
     private Accion accion = Accion.Ninguna;
 
@@ -259,8 +294,53 @@ else
             Email = socio.Email,
             UrlFoto = socio.UrlFoto,
         };
+        datosPin = new DatosPin();
+        errorPin = null;
         editandoDatos = true;
         mensaje = null;
+    }
+
+    private async Task GuardarPin()
+    {
+        if (socioId is null || socio is null || datosPin is null)
+        {
+            return;
+        }
+
+        if (!SocioAuth.PinCoincide(socio, datosPin.PinActual))
+        {
+            errorPin = "El PIN actual no es correcto.";
+            return;
+        }
+
+        if (!SocioAuth.PinValido(datosPin.PinNuevo))
+        {
+            errorPin = "El PIN nuevo debe tener 4 dígitos.";
+            return;
+        }
+
+        if (datosPin.PinNuevo != datosPin.PinNuevoRepetido)
+        {
+            errorPin = "El PIN nuevo no coincide en los dos campos.";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.Socios.Where(s => s.Id == socioId)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.PinHash, long.Parse(datosPin.PinNuevo!)));
+
+            datosPin = new DatosPin();
+            errorPin = null;
+            mensaje = "PIN actualizado.";
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            errorPin = ex.Message;
+        }
     }
 
     private async Task GuardarDatos()
@@ -371,5 +451,14 @@ else
         public string? Email { get; set; }
 
         public string? UrlFoto { get; set; }
+    }
+
+    private sealed class DatosPin
+    {
+        public string? PinActual { get; set; }
+
+        public string? PinNuevo { get; set; }
+
+        public string? PinNuevoRepetido { get; set; }
     }
 }

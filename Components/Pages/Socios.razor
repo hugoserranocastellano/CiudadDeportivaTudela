@@ -125,15 +125,15 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th role="button" @onclick='() => Ordenar("dni")'>DNI@Flecha("dni")</th>
-                    <th role="button" @onclick='() => Ordenar("nombre")'>Nombre@Flecha("nombre")</th>
-                    <th role="button" @onclick='() => Ordenar("apellidos")'>Apellidos@Flecha("apellidos")</th>
-                    <th role="button" @onclick='() => Ordenar("direccion")'>Dirección@Flecha("direccion")</th>
-                    <th role="button" @onclick='() => Ordenar("categoria")'>Categoría@Flecha("categoria")</th>
-                    <th role="button" @onclick='() => Ordenar("telefono")'>Teléfono@Flecha("telefono")</th>
-                    <th role="button" @onclick='() => Ordenar("email")'>Email@Flecha("email")</th>
-                    <th role="button" @onclick='() => Ordenar("alta")'>Alta@Flecha("alta")</th>
-                    <th role="button" @onclick='() => Ordenar("activo")'>Activo@Flecha("activo")</th>
+                    <th role="button" @onclick='() => Ordenar("dni")'>DNI@(Flecha("dni"))</th>
+                    <th role="button" @onclick='() => Ordenar("nombre")'>Nombre@(Flecha("nombre"))</th>
+                    <th role="button" @onclick='() => Ordenar("apellidos")'>Apellidos@(Flecha("apellidos"))</th>
+                    <th role="button" @onclick='() => Ordenar("direccion")'>Dirección@(Flecha("direccion"))</th>
+                    <th role="button" @onclick='() => Ordenar("categoria")'>Categoría@(Flecha("categoria"))</th>
+                    <th role="button" @onclick='() => Ordenar("telefono")'>Teléfono@(Flecha("telefono"))</th>
+                    <th role="button" @onclick='() => Ordenar("email")'>Email@(Flecha("email"))</th>
+                    <th role="button" @onclick='() => Ordenar("alta")'>Alta@(Flecha("alta"))</th>
+                    <th role="button" @onclick='() => Ordenar("activo")'>Activo@(Flecha("activo"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
@@ -323,6 +323,17 @@ else
 
             if (esNuevo)
             {
+                // El PIN de acceso se siembra con los últimos 4 dígitos del teléfono;
+                // el socio lo puede cambiar luego desde su perfil.
+                if (edicion.PinHash is null)
+                {
+                    var digitos = SocioAuth.SoloDigitos(edicion.Telefono);
+                    if (digitos.Length >= 4 && long.TryParse(digitos[^4..], out var pinInicial))
+                    {
+                        edicion.PinHash = pinInicial;
+                    }
+                }
+
                 db.Socios.Add(edicion);
             }
             else

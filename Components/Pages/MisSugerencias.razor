@@ -24,18 +24,18 @@ else if (sugerencias.Count == 0)
 }
 else
 {
-    <div class="table-responsive">
+    <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Fecha</th>
-                    <th>Sugerencia</th>
-                    <th>Respuesta de la junta</th>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("sugerencia")'>Sugerencia@(Flecha("sugerencia"))</th>
+                    <th role="button" @onclick='() => Ordenar("respuesta")'>Respuesta de la junta@(Flecha("respuesta"))</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var sugerencia in sugerencias)
+                @foreach (var sugerencia in Ordenados)
                 {
                     <tr class="@(string.IsNullOrWhiteSpace(sugerencia.Respuesta) ? "table-warning" : null)">
                         <td>@sugerencia.Id</td>
@@ -62,6 +62,50 @@ else
     private long? socioId;
     private List<Fila>? sugerencias;
     private string? error;
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (sugerencias is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => s => s.Id,
+                "sugerencia" => s => s.Descripcion,
+                "respuesta" => s => s.Respuesta,
+                _ => s => s.Fecha,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? sugerencias.OrderByDescending(clave)
+                : sugerencias.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override async Task OnInitializedAsync()
     {

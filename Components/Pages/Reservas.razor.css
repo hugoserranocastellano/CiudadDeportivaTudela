@@ -1,3 +1,7 @@
+.calendario-reservas td {
+    border-radius: .5rem;
+}
+
 .calendario-reservas td.dia-finde {
     background-color: #e9e9e9;
 }

@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 namespace CiudadDeportivaTudela.Services;
 
 /// <summary>
-/// Identificación del socio: usuario = teléfono, contraseña = los 4 últimos dígitos de ese
-/// mismo teléfono. No hay ningún PIN independiente que gestionar.
+/// Identificación del socio: usuario = teléfono, contraseña = su PIN (columna
+/// <see cref="Socio.PinHash"/>, pese al nombre no es un hash sino el PIN en claro).
+/// Se siembra al alta con los 4 últimos dígitos del teléfono, pero el socio puede
+/// cambiarlo luego y deja de coincidir con el teléfono.
 /// </summary>
 public static class SocioAuth
 {
@@ -50,21 +52,35 @@ public static class SocioAuth
     }
 
     /// <summary>
-    /// La contraseña es siempre los 4 últimos dígitos del teléfono registrado: no hay PIN que
-    /// mantener aparte.
+    /// El PIN vive en <see cref="Socio.PinHash"/>. Si un socio todavía no lo tiene
+    /// sembrado (altas antiguas sin migrar), se cae a los últimos 4 dígitos del
+    /// teléfono para no dejarlo sin poder entrar.
     /// </summary>
     public static bool PinCoincide(Socio socio, string? pinTecleado)
     {
-        var digitosTelefono = SoloDigitos(socio.Telefono);
         var pinRecibido = SoloDigitos(pinTecleado);
+        if (pinRecibido.Length == 0)
+        {
+            return false;
+        }
 
-        if (digitosTelefono.Length < 4 || pinRecibido.Length == 0)
+        if (socio.PinHash is long pin)
+        {
+            return pin.ToString("D4") == pinRecibido;
+        }
+
+        var digitosTelefono = SoloDigitos(socio.Telefono);
+        if (digitosTelefono.Length < 4)
         {
             return false;
         }
 
         return UltimosDigitos(digitosTelefono, 4) == pinRecibido;
     }
+
+    /// <summary>PIN válido para guardarse: exactamente 4 dígitos, nada más.</summary>
+    public static bool PinValido(string? pin) =>
+        !string.IsNullOrEmpty(pin) && pin.Length == 4 && pin.All(char.IsDigit);
 
     private static string UltimosDigitos(string digitos, int cantidad) =>
         digitos.Length > cantidad ? digitos[^cantidad..] : digitos;

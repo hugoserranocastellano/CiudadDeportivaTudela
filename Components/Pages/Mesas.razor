@@ -47,6 +47,18 @@
                         <label class="form-check-label" for="mesaActiva">Activa</label>
                     </div>
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label">Foto</label>
+                    @if (esNuevo)
+                    {
+                        <div class="form-text">Guarda primero la mesa para poder subir su foto.</div>
+                    }
+                    else
+                    {
+                        <FotoCropper Bucket="Mesas" Path="@edicion.Id.ToString()" FotoActualUrl="@edicion.UrlFotoMesa"
+                                     FotoSubida="@(url => edicion.UrlFotoMesa = url)" />
+                    }
+                </div>
             </div>
             <ValidationSummary class="mt-3 small" />
         </div>
@@ -71,21 +83,28 @@ else
         @mesas.Count mesa(s), @(mesas.Where(m => m.Activa != false).Sum(m => m.Capacidad)) plaza(s) activas.
     </p>
 
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Descripción</th>
-                    <th>Estancia</th>
-                    <th class="text-end">Capacidad</th>
-                    <th>Activa</th>
+                    <th>Foto</th>
+                    <th role="button" @onclick='() => Ordenar("descripcion")'>Descripción@(Flecha("descripcion"))</th>
+                    <th role="button" @onclick='() => Ordenar("estancia")'>Estancia@(Flecha("estancia"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("capacidad")'>Capacidad@(Flecha("capacidad"))</th>
+                    <th role="button" @onclick='() => Ordenar("activa")'>Activa@(Flecha("activa"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var mesa in mesas)
+                @foreach (var mesa in Ordenados)
                 {
                     <tr>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(mesa.UrlFotoMesa))
+                            {
+                                <img src="@mesa.UrlFotoMesa" alt="@mesa.Descripcion" style="width:40px;height:40px;object-fit:cover;" class="rounded" />
+                            }
+                        </td>
                         <td>@mesa.Descripcion</td>
                         <td>@mesa.Estancia</td>
                         <td class="text-end">@mesa.Capacidad</td>
@@ -116,6 +135,50 @@ else
     private bool activa = true;
     private long? idBorrando;
     private string? error;
+
+    private string ordenCampo = "estancia";
+    private bool ordenDescendente;
+
+    private List<Mesa> Ordenados
+    {
+        get
+        {
+            if (mesas is null)
+            {
+                return new List<Mesa>();
+            }
+
+            Func<Mesa, object?> clave = ordenCampo switch
+            {
+                "descripcion" => m => m.Descripcion,
+                "capacidad" => m => m.Capacidad,
+                "activa" => m => m.Activa,
+                _ => m => m.Estancia,
+            };
+
+            IEnumerable<Mesa> resultado = ordenDescendente
+                ? mesas.OrderByDescending(clave)
+                : mesas.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     private IEnumerable<string> Estancias => mesas is null
         ? Array.Empty<string>()

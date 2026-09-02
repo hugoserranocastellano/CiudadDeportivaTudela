@@ -81,22 +81,22 @@ else
 {
     <p class="text-muted">@movimientos.Count movimiento(s).</p>
 
-    <div class="table-responsive">
+    <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Fecha</th>
-                    <th>Artículo</th>
-                    <th>Tipo</th>
-                    <th class="text-end">Cantidad</th>
-                    <th>Ticket</th>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("articulo")'>Artículo@(Flecha("articulo"))</th>
+                    <th role="button" @onclick='() => Ordenar("tipo")'>Tipo@(Flecha("tipo"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("cantidad")'>Cantidad@(Flecha("cantidad"))</th>
+                    <th role="button" @onclick='() => Ordenar("ticket")'>Ticket@(Flecha("ticket"))</th>
                     <th>Observaciones</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var movimiento in movimientos)
+                @foreach (var movimiento in Ordenados)
                 {
                     <tr>
                         <td>@movimiento.Id</td>
@@ -138,6 +138,52 @@ else
 
     private static string Texto(Dictionary<long, string> indice, long? id) =>
         id is not null && indice.TryGetValue(id.Value, out var texto) ? texto : "—";
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (movimientos is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => m => m.Id,
+                "articulo" => m => Texto(articulosPorId, m.ArticuloId),
+                "tipo" => m => m.TipoMovimiento,
+                "cantidad" => m => m.Cantidad,
+                "ticket" => m => Texto(ticketsPorId, m.TicketId),
+                _ => m => m.CreatedAt,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? movimientos.OrderByDescending(clave)
+                : movimientos.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
     protected override Task OnInitializedAsync() => Cargar();
 
