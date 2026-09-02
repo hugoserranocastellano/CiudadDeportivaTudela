@@ -5,6 +5,27 @@ const estados = new Map();
 
 const ZOOM_MAX = 4;
 
+const LADO_MAXIMO = 1600;
+
+// Una foto de móvil moderna puede venir en 4000x3000px o más. Redibujarla en
+// cada frame de arrastre/zoom, y volver a hacerlo al exportar el recorte, es
+// pesado en un móvil y puede tardar lo bastante como para que el circuito de
+// Blazor dé la operación por cancelada ("A task was cancelled"). Se reduce
+// una sola vez al cargar, a un canvas intermedio, y todo lo demás trabaja
+// sobre esa copia ligera.
+function limitarResolucion(imagen, ladoMaximo) {
+    const escala = Math.min(1, ladoMaximo / Math.max(imagen.width, imagen.height));
+    if (escala === 1) {
+        return imagen;
+    }
+
+    const reducido = document.createElement('canvas');
+    reducido.width = Math.round(imagen.width * escala);
+    reducido.height = Math.round(imagen.height * escala);
+    reducido.getContext('2d').drawImage(imagen, 0, 0, reducido.width, reducido.height);
+    return reducido;
+}
+
 function distancia(p1, p2) {
     const dx = p1.clientX - p2.clientX;
     const dy = p1.clientY - p2.clientY;
@@ -169,14 +190,15 @@ export function cargar(canvasId, dataUrl) {
         const imagen = new Image();
         imagen.onload = () => {
             const tamano = canvas.width;
+            const imagenReducida = limitarResolucion(imagen, LADO_MAXIMO);
             // "cover": la escala mínima es la que hace que el lado más corto
             // de la imagen llene el cuadrado, sin dejar huecos en blanco.
-            const escalaMinima = tamano / Math.min(imagen.width, imagen.height);
+            const escalaMinima = tamano / Math.min(imagenReducida.width, imagenReducida.height);
 
             const estado = {
                 canvas,
                 tamano,
-                imagen,
+                imagen: imagenReducida,
                 escala: escalaMinima,
                 escalaMinima,
                 offsetX: 0,
@@ -223,7 +245,15 @@ export function recortar(canvasId, tamanoSalida) {
     ctx.drawImage(estado.imagen, x, y, anchoEscalado, altoEscalado);
 
     return new Promise((resolve, reject) => {
+        // Si toBlob nunca llama al callback (algún bug puntual de navegador),
+        // que falle con un mensaje claro en vez de quedar colgada hasta que
+        // Blazor la cancele sin explicación ("A task was cancelled").
+        const avisoTimeout = setTimeout(
+            () => reject(new Error('La exportación del recorte no respondió a tiempo.')),
+            10000);
+
         salida.toBlob((blob) => {
+            clearTimeout(avisoTimeout);
             if (!blob) {
                 reject(new Error('No se pudo generar la imagen recortada.'));
                 return;
