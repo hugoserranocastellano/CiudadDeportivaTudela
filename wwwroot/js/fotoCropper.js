@@ -252,16 +252,19 @@ export function recortar(canvasId, tamanoSalida) {
             () => reject(new Error('La exportación del recorte no respondió a tiempo.')),
             10000);
 
-        salida.toBlob((blob) => {
+        salida.toBlob(async (blob) => {
             clearTimeout(avisoTimeout);
             if (!blob) {
                 reject(new Error('No se pudo generar la imagen recortada.'));
                 return;
             }
-            const lector = new FileReader();
-            lector.onload = () => resolve(lector.result.split(',')[1]);
-            lector.onerror = () => reject(new Error('No se pudo leer la imagen recortada.'));
-            lector.readAsDataURL(blob);
+            // Se devuelve como Uint8Array (no como texto base64) para que
+            // Blazor lo transfiera con su streaming binario por chunks
+            // (IJSStreamReference) en vez de meterlo entero en un único
+            // mensaje del circuito SignalR: ese límite de tamaño de mensaje
+            // es la causa real de "A task was cancelled" al confirmar.
+            const buffer = await blob.arrayBuffer();
+            resolve(new Uint8Array(buffer));
         }, 'image/jpeg', 0.85);
     });
 }

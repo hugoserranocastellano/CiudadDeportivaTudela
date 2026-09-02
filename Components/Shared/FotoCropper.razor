@@ -126,10 +126,14 @@
         try
         {
             var js = await ModuloAsync();
-            var base64 = await js.InvokeAsync<string>("recortar", canvasId, 600);
-            var bytes = Convert.FromBase64String(base64);
 
-            using var stream = new MemoryStream(bytes);
+            // IJSStreamReference: el JPEG recortado viaja como binario troceado
+            // por el circuito SignalR, no como una cadena base64 metida entera en
+            // un único mensaje de interop (eso era lo que hacía fallar la subida
+            // con "A task was cancelled" al superar el tamaño máximo de mensaje).
+            await using var streamRef = await js.InvokeAsync<IJSStreamReference>("recortar", canvasId, 600);
+            await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: 2 * 1024 * 1024);
+
             var url = await Storage.SubirAsync(Bucket, $"{Path}.jpg", stream, "image/jpeg");
 
             await CerrarRecorte();
