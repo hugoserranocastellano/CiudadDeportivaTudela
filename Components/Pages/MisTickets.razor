@@ -78,27 +78,29 @@ else
                                     }
                                     else
                                     {
-                                        <table class="table table-sm mb-2">
-                                            <thead>
-                                                <tr>
-                                                    <th>Artículo</th>
-                                                    <th class="text-end">Precio unidad</th>
-                                                    <th class="text-end">Unidades</th>
-                                                    <th class="text-end">Subtotal</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach (var linea in lineas)
-                                                {
+                                        <div class="table-responsive">
+                                            <table class="table table-sm mb-2">
+                                                <thead>
                                                     <tr>
-                                                        <td>@linea.Articulo</td>
-                                                        <td class="text-end">@linea.PrecioUnidad?.ToString("0.00")€</td>
-                                                        <td class="text-end">@linea.Unidades</td>
-                                                        <td class="text-end">@linea.Subtotal?.ToString("0.00")€</td>
+                                                        <th>Artículo</th>
+                                                        <th class="text-end">Precio unidad</th>
+                                                        <th class="text-end">Unidades</th>
+                                                        <th class="text-end">Subtotal</th>
                                                     </tr>
-                                                }
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var linea in lineas)
+                                                    {
+                                                        <tr>
+                                                            <td>@linea.Articulo</td>
+                                                            <td class="text-end">@linea.PrecioUnidad?.ToString("0.00")€</td>
+                                                            <td class="text-end">@linea.Unidades</td>
+                                                            <td class="text-end">@linea.Subtotal?.ToString("0.00")€</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     }
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="Deseleccionar">Volver</button>
                                 }

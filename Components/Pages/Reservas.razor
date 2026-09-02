@@ -103,12 +103,12 @@ else
                     var ocupado = grupo.Key is long tipoId && ocupacion.TryGetValue((diaSeleccionado.Value, tipoId), out var oc) ? oc : 0;
                     var disponibles = Math.Max(0, aforoTotal - ocupado);
                     <h6 class="mt-2 fw-bold">
-                        @diaSeleccionado.Value.ToString("dd/MM/yy") - @(tipo?.Descripcion.ToUpper() ?? grupo.First().TipoReservaDescripcion.ToUpper())
+                        @(tipo?.Descripcion.ToUpper() ?? grupo.First().TipoReservaDescripcion.ToUpper())
                         @if (tipo?.HoraInicio is not null && tipo.HoraFin is not null)
                         {
                             <text> - @tipo.HoraInicio.Value.ToString("HH:mm") a @tipo.HoraFin.Value.ToString("HH:mm")</text>
                         }
-                        , @disponibles disponibles /@aforoTotal
+                        - Disp: @disponibles/@aforoTotal
                     </h6>
                     <div class="d-flex flex-column gap-2 mb-3">
                         @foreach (var r in grupo)
@@ -196,6 +196,12 @@ else
                                 <label class="form-label">Comensales</label>
                                 <InputNumber class="form-control" @bind-Value="edicion.Comensales" />
                             </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="limpieza" id="resLimpieza" />
+                                    <label class="form-check-label" for="resLimpieza">Servicio de limpieza</label>
+                                </div>
+                            </div>
                             <div class="col-12">
                                 <label class="form-label">Mesas disponibles</label>
                                 @if (mesasDisponibles is null)
@@ -268,6 +274,7 @@ else
     private string? errorForm;
     private List<Mesa>? mesasDisponibles;
     private HashSet<long> mesasSeleccionadas = new();
+    private bool limpieza;
 
     private bool PuedeRetroceder => new DateOnly(mesActual.Year, mesActual.Month, 1) > new DateOnly(hoy.Year, hoy.Month, 1);
     private bool PuedeAvanzar => new DateOnly(mesActual.Year, mesActual.Month, 1) < new DateOnly(limiteMax.Year, limiteMax.Month, 1);
@@ -517,6 +524,7 @@ else
             SocioId = esJunta ? null : socioId,
         };
         mesasSeleccionadas = new HashSet<long>();
+        limpieza = false;
         errorForm = null;
         _ = CargarMesasDisponibles();
     }
@@ -631,6 +639,7 @@ else
                 return;
             }
 
+            edicion.Limpieza = limpieza;
             edicion.ReservaMesas = mesasElegidas.Select(m => new ReservaMesa { MesaId = m.Id }).ToList();
             db.Reservas.Add(edicion);
             await db.SaveChangesAsync();

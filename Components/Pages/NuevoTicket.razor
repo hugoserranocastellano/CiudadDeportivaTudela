@@ -28,9 +28,20 @@ else
         <div class="alert alert-danger py-2"><code>@error</code></div>
     }
 
+    @if (mensajeCatalogo is not null)
+    {
+        <div class="alert alert-success py-2 text-center shadow"
+             style="position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); z-index:1050; max-width:90vw;">
+            @mensajeCatalogo
+        </div>
+    }
+
     <div class="card mb-3">
         <div class="card-body">
-            <label class="form-label">Añadir producto</label>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <label class="form-label mb-0">Añadir producto</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => verArticulos = true">Ver artículos</button>
+            </div>
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <input class="form-control" style="max-width: 320px;" list="listaArticulos"
                        placeholder="Escribe o elige un producto (ej. cer)"
@@ -45,7 +56,6 @@ else
                 {
                     <img src="@coincidente.UrlFoto" alt="@coincidente.Descripcion" style="width:40px;height:40px;object-fit:cover;" class="rounded" />
                 }
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => verArticulos = true">Ver artículos</button>
             </div>
         </div>
     </div>
@@ -58,14 +68,10 @@ else
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => verArticulos = false">← Volver</button>
             </div>
             <div class="card-body">
-                @if (mensajeCatalogo is not null)
-                {
-                    <div class="alert alert-success py-2">@mensajeCatalogo</div>
-                }
                 <div class="row row-cols-2 row-cols-md-4 g-3">
                     @foreach (var a in articulos)
                     {
-                        <div class="col text-center" role="button" style="cursor:pointer" @ondblclick="() => AnadirDesdeCatalogo(a)">
+                        <div class="col text-center" role="button" style="cursor:pointer" @ondblclick="() => _ = AnadirDesdeCatalogo(a)">
                             @if (!string.IsNullOrWhiteSpace(a.UrlFoto))
                             {
                                 <img src="@a.UrlFoto" alt="@a.Descripcion" style="width:100%;max-width:100px;height:100px;object-fit:cover;" class="rounded" />
@@ -224,10 +230,22 @@ else
 
     private string? mensajeCatalogo;
 
-    private void AnadirDesdeCatalogo(Articulo articulo)
+    private int tokenMensajeCatalogo;
+
+    private async Task AnadirDesdeCatalogo(Articulo articulo)
     {
         Anadir(articulo);
         mensajeCatalogo = $"«{articulo.Descripcion}» añadido.";
+
+        var token = ++tokenMensajeCatalogo;
+        await Task.Delay(2000);
+        // Si mientras tanto se añadió otro artículo, ese nuevo mensaje ya se
+        // encarga de su propio borrado; no lo pisamos aquí.
+        if (token == tokenMensajeCatalogo)
+        {
+            mensajeCatalogo = null;
+            StateHasChanged();
+        }
     }
 
     private void Anadir(Articulo articulo)
