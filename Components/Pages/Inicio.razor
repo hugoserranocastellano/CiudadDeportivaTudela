@@ -91,10 +91,7 @@ else
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span class="fw-semibold">Reservas</span>
             <div class="d-flex flex-wrap gap-2">
-                @if (esJunta)
-                {
-                    <button class="btn btn-sm btn-pena btn-accion" @onclick="@(() => Navegacion.NavigateTo("/reservas"))">Nueva reserva</button>
-                }
+                <button class="btn btn-sm btn-pena btn-accion" @onclick="@(() => Navegacion.NavigateTo("/reservas"))">Nueva reserva</button>
                 <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-reservas"))">Historial</button>
             </div>
         </div>
@@ -169,7 +166,6 @@ else
     private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
 
     private long? socioId;
-    private bool esJunta;
     private Socio? socio;
     private List<Evento>? eventos;
     private HashSet<long> inscrito = new();
@@ -195,7 +191,6 @@ else
 
         var estado = await EstadoAutenticacion;
         socioId = SocioAuth.SocioId(estado.User);
-        esJunta = SocioAuth.EsJunta(estado.User);
 
         await Cargar();
     }

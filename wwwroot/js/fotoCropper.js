@@ -136,8 +136,16 @@ function enganchar(estado) {
 
 // Lee el fichero directamente del <input> en el navegador (sin pasar por
 // Blazor Server): mandar una foto de varios MB como argumento de interop por
-// el circuito SignalR es lento y puede superar su timeout/tamaño máximo de
-// mensaje, lo que se ve como "A task was cancelled" en el cliente.
+// el circuito SignalR es lento y puede superar su timeout, lo que se ve como
+// "A task was cancelled" en el cliente.
+//
+// Se usa un object URL (URL.createObjectURL) en vez de FileReader.readAsDataURL:
+// convertir una foto de móvil sin comprimir (a menudo 10-20MB) a base64 es una
+// operación de CPU pesada que puede tardar varios segundos y bloquear el hilo
+// del navegador el tiempo suficiente para que el circuito de SignalR dé la
+// conexión por muerta a mitad de la llamada. Un object URL es casi
+// instantáneo sea cual sea el tamaño del fichero, porque no copia ni
+// recodifica los bytes.
 export function cargarDesdeInput(canvasId, inputElement, maxBytes) {
     const file = inputElement && inputElement.files && inputElement.files[0];
     if (!file) {
@@ -147,12 +155,8 @@ export function cargarDesdeInput(canvasId, inputElement, maxBytes) {
         return Promise.reject(new Error('La foto pesa demasiado (máximo 5 MB).'));
     }
 
-    return new Promise((resolve, reject) => {
-        const lector = new FileReader();
-        lector.onload = () => cargar(canvasId, lector.result).then(resolve).catch(reject);
-        lector.onerror = () => reject(new Error('No se pudo leer el fichero.'));
-        lector.readAsDataURL(file);
-    });
+    const url = URL.createObjectURL(file);
+    return cargar(canvasId, url).finally(() => URL.revokeObjectURL(url));
 }
 
 export function cargar(canvasId, dataUrl) {

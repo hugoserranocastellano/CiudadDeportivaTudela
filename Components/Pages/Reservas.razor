@@ -5,7 +5,6 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Reservas</PageTitle>
-<JuntaGuard />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Reservas</h1>
@@ -140,13 +139,20 @@ else
                             </div>
                             <div class="col-md-5">
                                 <label class="form-label">Socio</label>
-                                <InputSelect class="form-select" @bind-Value="edicion.SocioId">
-                                    <option value="">(sin socio)</option>
-                                    @foreach (var socio in socios)
-                                    {
-                                        <option value="@socio.Id">@socio.Texto</option>
-                                    }
-                                </InputSelect>
+                                @if (esJunta)
+                                {
+                                    <InputSelect class="form-select" @bind-Value="edicion.SocioId">
+                                        <option value="">(sin socio)</option>
+                                        @foreach (var socio in socios)
+                                        {
+                                            <option value="@socio.Id">@socio.Texto</option>
+                                        }
+                                    </InputSelect>
+                                }
+                                else
+                                {
+                                    <input class="form-control" disabled value="@NombrePropio" />
+                                }
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Comensales</label>
@@ -193,7 +199,14 @@ else
 }
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
     private static readonly string[] nombresDias = { "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" };
+
+    private long? socioId;
+    private bool esJunta;
+    private string NombrePropio => socios.FirstOrDefault(s => s.Id == socioId)?.Texto ?? "Yo";
 
     private DateOnly hoy;
     private DateOnly limiteMax;
@@ -223,6 +236,14 @@ else
         hoy = DateOnly.FromDateTime(DateTime.Today);
         limiteMax = hoy.AddMonths(2);
         mesActual = hoy;
+
+        if (EstadoAutenticacion is not null)
+        {
+            var estado = await EstadoAutenticacion;
+            socioId = SocioAuth.SocioId(estado.User);
+            esJunta = SocioAuth.EsJunta(estado.User);
+        }
+
         await CargarMes();
     }
 
@@ -382,7 +403,12 @@ else
             return;
         }
 
-        edicion = new Reserva { Fecha = diaSeleccionado.Value, TipoReservaId = tipos.FirstOrDefault()?.Id };
+        edicion = new Reserva
+        {
+            Fecha = diaSeleccionado.Value,
+            TipoReservaId = tipos.FirstOrDefault()?.Id,
+            SocioId = esJunta ? null : socioId,
+        };
         mesasSeleccionadas = new HashSet<long>();
         errorForm = null;
         _ = CargarMesasDisponibles();
@@ -455,6 +481,11 @@ else
         {
             errorForm = "Selecciona un tipo de reserva.";
             return;
+        }
+
+        if (!esJunta)
+        {
+            edicion.SocioId = socioId;
         }
 
         if (mesasSeleccionadas.Count == 0)
