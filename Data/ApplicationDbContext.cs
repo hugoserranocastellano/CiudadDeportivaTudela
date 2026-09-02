@@ -152,6 +152,8 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id_tipo_reserva");
             entity.Property(e => e.Descripcion).HasColumnName("TipoReserva").IsRequired();
+            entity.Property(e => e.HoraInicio).HasColumnName("HoraInicio");
+            entity.Property(e => e.HoraFin).HasColumnName("HoraFin");
         });
 
         modelBuilder.Entity<ReservaMesa>(entity =>

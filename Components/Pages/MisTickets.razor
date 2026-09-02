@@ -28,6 +28,10 @@ else if (tickets.Count == 0)
 }
 else
 {
+    <p class="text-muted">
+        @tickets.Count ticket(s), @(tickets.Sum(t => t.ImporteTotal ?? 0).ToString("N2")) € en total.
+    </p>
+
     <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle mb-0">
             <thead>

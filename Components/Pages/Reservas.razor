@@ -22,7 +22,10 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Mes anterior</button>
-    <h4 class="mb-0 text-capitalize">@mesActual.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("es-ES"))</h4>
+    <div class="text-center flex-grow-1">
+        <div class="h4 mb-0 text-capitalize">@mesActual.ToString("MMMM", CultureInfo.GetCultureInfo("es-ES"))</div>
+        <div class="text-muted">@mesActual.Year</div>
+    </div>
     <button class="btn btn-outline-secondary" disabled="@(!PuedeAvanzar)" @onclick="MesSiguiente">Mes siguiente →</button>
 </div>
 
@@ -57,14 +60,13 @@ else
                                 var celda = dia.Value;
                                 var habilitado = EnRango(celda);
                                 <td class="@ClaseDia(celda, habilitado)" style="cursor:@(habilitado ? "pointer" : "default")" @onclick="() => AbrirDia(celda)">
-                                    <div class="dia-numero">@celda.Day</div>
-                                    @foreach (var tipo in tipos)
-                                    {
-                                        @if (ocupacion.TryGetValue((celda, tipo.Id), out var oc) && oc > 0)
+                                    <div class="dia-numero">
+                                        @celda.Day
+                                        @if (TieneReserva(celda))
                                         {
-                                            <div class="small">@Abrev(tipo.Descripcion): @oc/@aforoMaximo</div>
+                                            <span class="dia-punto" title="Hay reservas este día"></span>
                                         }
-                                    }
+                                    </div>
                                 </td>
                             }
                         }
@@ -241,12 +243,9 @@ else
     private DateOnly mesActual;
     private List<DateOnly>? dias;
     private Dictionary<(DateOnly, long), int> ocupacion = new();
-    private int aforoMaximo;
     private List<Opcion> socios = new();
     private List<TipoReserva> tipos = new();
     private string? error;
-
-    private static string Abrev(string descripcion) => descripcion.Length <= 4 ? descripcion : descripcion[..3] + ".";
 
     private DateOnly? diaSeleccionado;
     private List<ReservaFila>? reservasDelDia;
@@ -393,8 +392,6 @@ else
             var primerDia = new DateOnly(mesActual.Year, mesActual.Month, 1);
             var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
             dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
-
-            aforoMaximo = await db.Mesas.Where(m => m.Activa != false).SumAsync(m => (int?)m.Capacidad) ?? 0;
 
             var filas = await db.Reservas
                 .AsNoTracking()

@@ -125,6 +125,7 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
+                    <th>Foto</th>
                     <th role="button" @onclick='() => Ordenar("dni")'>DNI@(Flecha("dni"))</th>
                     <th role="button" @onclick='() => Ordenar("nombre")'>Nombre@(Flecha("nombre"))</th>
                     <th role="button" @onclick='() => Ordenar("apellidos")'>Apellidos@(Flecha("apellidos"))</th>
@@ -141,6 +142,12 @@ else
                 @foreach (var socio in Filtrados)
                 {
                     <tr>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(socio.UrlFoto))
+                            {
+                                <img src="@socio.UrlFoto" alt="@socio.Nombre" style="width:36px;height:36px;object-fit:cover;" class="rounded-circle" />
+                            }
+                        </td>
                         <td>@socio.Dni</td>
                         <td>@socio.Nombre</td>
                         <td>@socio.Apellidos</td>

@@ -18,3 +18,13 @@
     font-weight: 700;
     color: #b45300;
 }
+
+.dia-punto {
+    display: inline-block;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background-color: #b45300;
+    margin-left: .25rem;
+    vertical-align: middle;
+}

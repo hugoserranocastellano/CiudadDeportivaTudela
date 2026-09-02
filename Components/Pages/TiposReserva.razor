@@ -27,6 +27,14 @@
                     <label class="form-label">Descripción</label>
                     <InputText class="form-control" @bind-Value="edicion.Descripcion" />
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Hora inicio</label>
+                    <InputDate Type="InputDateType.Time" class="form-control" @bind-Value="edicion.HoraInicio" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Hora fin</label>
+                    <InputDate Type="InputDateType.Time" class="form-control" @bind-Value="edicion.HoraFin" />
+                </div>
             </div>
             <ValidationSummary class="mt-3 small" />
         </div>
@@ -54,6 +62,7 @@ else
             <thead>
                 <tr>
                     <th role="button" @onclick='() => Ordenar("descripcion")'>Descripción@(Flecha("descripcion"))</th>
+                    <th>Horario</th>
                     <th class="text-end" role="button" @onclick='() => Ordenar("reservas")'>Reservas@(Flecha("reservas"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
@@ -63,6 +72,7 @@ else
                 {
                     <tr>
                         <td>@fila.Tipo.Descripcion</td>
+                        <td>@(fila.Tipo.HoraInicio is null ? "—" : $"{fila.Tipo.HoraInicio:HH\\:mm} - {fila.Tipo.HoraFin:HH\\:mm}")</td>
                         <td class="text-end">@fila.NumeroReservas</td>
                         <td class="text-end text-nowrap">
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(fila.Tipo)">Editar</button>
@@ -164,7 +174,13 @@ else
 
     private void Editar(TipoReserva tipo)
     {
-        edicion = new TipoReserva { Id = tipo.Id, Descripcion = tipo.Descripcion };
+        edicion = new TipoReserva
+        {
+            Id = tipo.Id,
+            Descripcion = tipo.Descripcion,
+            HoraInicio = tipo.HoraInicio,
+            HoraFin = tipo.HoraFin,
+        };
         esNuevo = false;
         idBorrando = null;
     }

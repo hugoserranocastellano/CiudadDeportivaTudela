@@ -9,7 +9,7 @@
         <div class="top-row px-4">
             <AuthorizeView>
                 <Authorized>
-                    <span class="socio-actual">@context.User.Identity?.Name</span>
+                    <a class="socio-actual" href="inicio">@context.User.Identity?.Name</a>
                     <form method="post" action="/logout" class="d-inline">
                         <AntiforgeryToken />
                         <button type="submit" class="btn btn-sm btn-outline-danger">Salir</button>
