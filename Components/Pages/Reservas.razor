@@ -95,9 +95,21 @@ else
             }
             else
             {
-                @foreach (var grupo in reservasDelDia.GroupBy(r => r.TipoReservaDescripcion))
+                @foreach (var grupo in reservasDelDia
+                    .GroupBy(r => r.TipoReservaId)
+                    .OrderBy(g => tipos.FirstOrDefault(t => t.Id == g.Key)?.Orden))
                 {
-                    <h6 class="mt-2">@grupo.Key</h6>
+                    var tipo = tipos.FirstOrDefault(t => t.Id == grupo.Key);
+                    var ocupado = grupo.Key is long tipoId && ocupacion.TryGetValue((diaSeleccionado.Value, tipoId), out var oc) ? oc : 0;
+                    var disponibles = Math.Max(0, aforoTotal - ocupado);
+                    <h6 class="mt-2 fw-bold">
+                        @diaSeleccionado.Value.ToString("dd/MM/yy") - @(tipo?.Descripcion.ToUpper() ?? grupo.First().TipoReservaDescripcion.ToUpper())
+                        @if (tipo?.HoraInicio is not null && tipo.HoraFin is not null)
+                        {
+                            <text> - @tipo.HoraInicio.Value.ToString("HH:mm") a @tipo.HoraFin.Value.ToString("HH:mm")</text>
+                        }
+                        , @disponibles disponibles /@aforoTotal
+                    </h6>
                     <div class="d-flex flex-column gap-2 mb-3">
                         @foreach (var r in grupo)
                         {
@@ -243,6 +255,7 @@ else
     private DateOnly mesActual;
     private List<DateOnly>? dias;
     private Dictionary<(DateOnly, long), int> ocupacion = new();
+    private int aforoTotal;
     private List<Opcion> socios = new();
     private List<TipoReserva> tipos = new();
     private string? error;
@@ -393,6 +406,8 @@ else
             var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
             dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
 
+            aforoTotal = await db.Mesas.Where(m => m.Activa != false).SumAsync(m => (int?)m.Capacidad) ?? 0;
+
             var filas = await db.Reservas
                 .AsNoTracking()
                 .Where(r => r.Estado == "activa" && r.Fecha >= primerDia && r.Fecha <= ultimoDia && r.TipoReservaId != null)
@@ -410,7 +425,8 @@ else
 
             tipos = await db.TiposReserva
                 .AsNoTracking()
-                .OrderBy(t => t.Descripcion)
+                .OrderBy(t => t.Orden)
+                .ThenBy(t => t.Descripcion)
                 .ToListAsync();
 
             socios = (await db.Socios
@@ -465,10 +481,11 @@ else
             reservasDelDia = await db.Reservas
                 .AsNoTracking()
                 .Where(r => r.Estado == "activa" && r.Fecha == diaSeleccionado.Value)
-                .OrderBy(r => r.TipoReserva!.Descripcion)
+                .OrderBy(r => r.TipoReserva!.Orden)
                 .Select(r => new ReservaFila(
                     r.Id,
                     r.SocioId,
+                    r.TipoReservaId,
                     r.TipoReserva != null ? r.TipoReserva.Descripcion : "(sin tipo)",
                     r.Socio != null ? $"{r.Socio.Nombre} {r.Socio.Apellidos}".Trim() : "(sin socio)",
                     r.Socio != null ? r.Socio.UrlFoto : null,
@@ -663,6 +680,6 @@ else
     private record Opcion(long Id, string Texto);
 
     private record ReservaFila(
-        long Id, long? SocioId, string TipoReservaDescripcion, string SocioNombre, string? SocioFoto,
+        long Id, long? SocioId, long? TipoReservaId, string TipoReservaDescripcion, string SocioNombre, string? SocioFoto,
         int Comensales, List<string> Mesas, bool? Limpieza, string? SocioTelefono);
 }

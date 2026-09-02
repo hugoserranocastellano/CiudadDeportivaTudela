@@ -23,9 +23,13 @@
         <div class="card-header fw-semibold">@(esNuevo ? "Nuevo tipo de reserva" : $"Editar «{edicion.Descripcion}»")</div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label class="form-label">Descripción</label>
                     <InputText class="form-control" @bind-Value="edicion.Descripcion" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Orden</label>
+                    <InputNumber class="form-control" @bind-Value="edicion.Orden" />
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Hora inicio</label>
@@ -61,6 +65,7 @@ else
         <table class="table table-striped align-middle">
             <thead>
                 <tr>
+                    <th role="button" @onclick='() => Ordenar("orden")'>Orden@(Flecha("orden"))</th>
                     <th role="button" @onclick='() => Ordenar("descripcion")'>Descripción@(Flecha("descripcion"))</th>
                     <th>Horario</th>
                     <th class="text-end" role="button" @onclick='() => Ordenar("reservas")'>Reservas@(Flecha("reservas"))</th>
@@ -71,6 +76,7 @@ else
                 @foreach (var fila in Ordenados)
                 {
                     <tr>
+                        <td>@fila.Tipo.Orden</td>
                         <td>@fila.Tipo.Descripcion</td>
                         <td>@(fila.Tipo.HoraInicio is null ? "—" : $"{fila.Tipo.HoraInicio:HH\\:mm} - {fila.Tipo.HoraFin:HH\\:mm}")</td>
                         <td class="text-end">@fila.NumeroReservas</td>
@@ -100,7 +106,7 @@ else
     private long? idBorrando;
     private string? error;
 
-    private string ordenCampo = "descripcion";
+    private string ordenCampo = "orden";
     private bool ordenDescendente;
 
     private List<Fila> Ordenados
@@ -115,7 +121,8 @@ else
             Func<Fila, object?> clave = ordenCampo switch
             {
                 "reservas" => f => f.NumeroReservas,
-                _ => f => f.Tipo.Descripcion,
+                "descripcion" => f => f.Tipo.Descripcion,
+                _ => f => f.Tipo.Orden,
             };
 
             IEnumerable<Fila> resultado = ordenDescendente
@@ -180,6 +187,7 @@ else
             Descripcion = tipo.Descripcion,
             HoraInicio = tipo.HoraInicio,
             HoraFin = tipo.HoraFin,
+            Orden = tipo.Orden,
         };
         esNuevo = false;
         idBorrando = null;

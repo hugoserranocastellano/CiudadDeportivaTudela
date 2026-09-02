@@ -13,5 +13,7 @@ public class TipoReserva
 
     public TimeOnly? HoraFin { get; set; }
 
+    public int? Orden { get; set; }
+
     public ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
 }
