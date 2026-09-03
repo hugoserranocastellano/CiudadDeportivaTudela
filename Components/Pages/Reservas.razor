@@ -21,6 +21,13 @@
     Periodo abierto del @hoy.ToString("dd/MM/yyyy") al @limiteMax.ToString("dd/MM/yyyy").
 </p>
 
+<p class="text-muted small">
+    <span class="leyenda-punto leyenda-finde"></span> Fin de semana/festivo
+    <span class="leyenda-punto leyenda-reserva ms-3"></span> Con reservas
+    <span class="leyenda-punto leyenda-propia ms-3"></span> Reserva propia
+    <span class="leyenda-punto leyenda-hoy ms-3"></span> Hoy
+</p>
+
 <div class="d-flex align-items-center justify-content-between mb-3">
     <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Mes anterior</button>
     <div class="text-center flex-grow-1">

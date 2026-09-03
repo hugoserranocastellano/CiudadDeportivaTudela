@@ -103,5 +103,8 @@ h1:focus {
 .tabla-marco {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: .5rem;
-    overflow: hidden;
+    /* No usar "overflow: hidden" aquí: pisaría el "overflow-x: auto" de
+       .table-responsive y dejaría las tablas sin scroll horizontal en móvil. */
+    overflow-x: auto;
+    overflow-y: hidden;
 }
