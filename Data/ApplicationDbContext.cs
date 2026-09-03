@@ -60,8 +60,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Activo).HasColumnName("activo");
             entity.Property(e => e.FechaAlta).HasColumnName("fecha_alta");
             entity.Property(e => e.Direccion).HasColumnName("direccion");
-            entity.Property(e => e.UltimoAcceso).HasColumnName("ultimo_acceso");
-            entity.Property(e => e.ValidezPin).HasColumnName("validez_pin");
+            entity.Property(e => e.UltimoAcceso).HasColumnName("UltimoAcceso");
+            entity.Property(e => e.ValidezPin).HasColumnName("ValidezPin");
 
             entity.HasOne(e => e.CategoriaSocio)
                 .WithMany()
