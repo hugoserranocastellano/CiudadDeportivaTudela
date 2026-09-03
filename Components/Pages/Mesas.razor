@@ -89,9 +89,7 @@ else
                 <tr>
                     <th>Foto</th>
                     <th role="button" @onclick='() => Ordenar("descripcion")'>Descripción@(Flecha("descripcion"))</th>
-                    <th role="button" @onclick='() => Ordenar("estancia")'>Estancia@(Flecha("estancia"))</th>
                     <th class="text-end" role="button" @onclick='() => Ordenar("capacidad")'>Capacidad@(Flecha("capacidad"))</th>
-                    <th role="button" @onclick='() => Ordenar("activa")'>Activa@(Flecha("activa"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
@@ -106,11 +104,9 @@ else
                             }
                         </td>
                         <td>@mesa.Descripcion</td>
-                        <td>@mesa.Estancia</td>
                         <td class="text-end">@mesa.Capacidad</td>
-                        <td>@(mesa.Activa == true ? "Sí" : "No")</td>
                         <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(mesa)">Editar</button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Editar" @onclick="() => Editar(mesa)"><i class="bi bi-pencil"></i></button>
                             @if (idBorrando == mesa.Id)
                             {
                                 <button class="btn btn-sm btn-danger" @onclick="() => Borrar(mesa.Id)">Confirmar</button>
