@@ -272,7 +272,7 @@ else
                     .SetProperty(s => s.Respuesta, texto)
                     .SetProperty(s => s.FechaRespuesta, texto is null
                         ? null
-                        : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)));
+                        : DateTime.UtcNow));
 
             await Cargar();
         }
