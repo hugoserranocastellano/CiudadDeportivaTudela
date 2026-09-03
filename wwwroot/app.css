@@ -100,6 +100,24 @@ h1:focus {
     text-decoration: underline;
 }
 
+/* Botón de icono con texto: el proyecto no incluye la fuente de Bootstrap
+   Icons, así que los <i class="bi bi-..."> no pintan nada. En vez de tirar
+   de icono, usamos un recuadro gris oscuro con una abreviatura. */
+.btn-accion-icono {
+    background-color: #495057;
+    border-color: #495057;
+    color: #fff;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.btn-accion-icono:hover,
+.btn-accion-icono:focus {
+    background-color: #343a40;
+    border-color: #343a40;
+    color: #fff;
+}
+
 .tabla-marco {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: .5rem;

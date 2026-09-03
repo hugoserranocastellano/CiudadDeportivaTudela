@@ -78,9 +78,9 @@ else
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(ticket.UrlFotoTicket))
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Ver foto del ticket"
+                                        <button type="button" class="btn btn-sm btn-accion-icono" title="Ver foto del ticket"
                                                 @onclick:stopPropagation="true" @onclick="() => ToggleFoto(ticket.Id)">
-                                            <i class="bi bi-eye"></i>
+                                            Ver
                                         </button>
                                     }
                                 </td>

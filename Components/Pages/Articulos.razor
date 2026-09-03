@@ -71,6 +71,18 @@
         <div class="card-footer d-flex gap-2">
             <button type="submit" class="btn btn-pena">Guardar</button>
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+            @if (!esNuevo)
+            {
+                @if (idBorrando == edicion.Id)
+                {
+                    <button type="button" class="btn btn-danger ms-auto" @onclick="() => Borrar(edicion.Id)">Confirmar borrado</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => idBorrando = edicion.Id">Borrar artículo</button>
+                }
+            }
         </div>
     </EditForm>
 }
@@ -110,16 +122,7 @@ else
                         <td>@articulo.Descripcion</td>
                         <td class="text-end">@articulo.PrecioUnidad.ToString("N2") €</td>
                         <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary" title="Editar" @onclick="() => Editar(articulo)"><i class="bi bi-pencil"></i></button>
-                            @if (idBorrando == articulo.Id)
-                            {
-                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(articulo.Id)">Confirmar</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = articulo.Id">Borrar</button>
-                            }
+                            <button class="btn btn-sm btn-accion-icono" title="Editar" @onclick="() => Editar(articulo)">Ed.</button>
                         </td>
                     </tr>
                 }
@@ -276,6 +279,7 @@ else
             await using var db = await DbFactory.CreateDbContextAsync();
 
             await db.Articulos.Where(a => a.Id == id).ExecuteDeleteAsync();
+            edicion = null;
             await Cargar();
         }
         catch (Exception ex)

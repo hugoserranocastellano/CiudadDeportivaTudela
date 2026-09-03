@@ -65,6 +65,18 @@
         <div class="card-footer d-flex gap-2">
             <button type="submit" class="btn btn-pena">Guardar</button>
             <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+            @if (!esNuevo)
+            {
+                @if (idBorrando == edicion.Id)
+                {
+                    <button type="button" class="btn btn-danger ms-auto" @onclick="() => Borrar(edicion.Id)">Confirmar borrado</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => idBorrando = edicion.Id">Borrar mesa</button>
+                }
+            }
         </div>
     </EditForm>
 }
@@ -106,16 +118,7 @@ else
                         <td>@mesa.Descripcion</td>
                         <td class="text-end">@mesa.Capacidad</td>
                         <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary" title="Editar" @onclick="() => Editar(mesa)"><i class="bi bi-pencil"></i></button>
-                            @if (idBorrando == mesa.Id)
-                            {
-                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(mesa.Id)">Confirmar</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = mesa.Id">Borrar</button>
-                            }
+                            <button class="btn btn-sm btn-accion-icono" title="Editar" @onclick="() => Editar(mesa)">Ed.</button>
                         </td>
                     </tr>
                 }
@@ -273,6 +276,7 @@ else
             await using var db = await DbFactory.CreateDbContextAsync();
 
             await db.Mesas.Where(m => m.Id == id).ExecuteDeleteAsync();
+            edicion = null;
             await Cargar();
         }
         catch (Exception ex)
