@@ -336,7 +336,9 @@ else
             await using var db = await DbFactory.CreateDbContextAsync();
 
             await db.Socios.Where(s => s.Id == socioId)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.PinHash, long.Parse(datosPin.PinNuevo!)));
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.PinHash, long.Parse(datosPin.PinNuevo!))
+                    .SetProperty(x => x.ValidezPin, DateTime.UtcNow));
 
             datosPin = new DatosPin();
             errorPin = null;

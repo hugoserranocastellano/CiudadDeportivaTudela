@@ -118,6 +118,17 @@
             return;
         }
 
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Socios.Where(s => s.Id == socio.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.UltimoAcceso, DateTime.UtcNow));
+        }
+        catch
+        {
+            // Informativo para la junta; un fallo aquí no debe impedir el acceso.
+        }
+
         await HttpContext.SignInAsync(SocioAuth.Scheme, SocioAuth.CrearPrincipal(socio));
 
         Navigation.NavigateTo(DestinoSeguro(), forceLoad: true);

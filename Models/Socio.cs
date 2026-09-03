@@ -31,4 +31,9 @@ public class Socio
     public DateTime? FechaAlta { get; set; }
 
     public string? Direccion { get; set; }
+
+    // Informativos para la junta: no condicionan el acceso.
+    public DateTime? UltimoAcceso { get; set; }
+
+    public DateTime? ValidezPin { get; set; }
 }

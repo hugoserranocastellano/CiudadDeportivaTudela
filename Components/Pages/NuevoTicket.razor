@@ -43,6 +43,12 @@ else
     {
         <div class="alert alert-success py-2">@mensajeGuardado</div>
     }
+    @if (avisoLimpieza)
+    {
+        <div class="alert alert-warning py-2">
+            Tienes marcada la limpieza en tu reserva de hoy: recuerda hacer el sobre de "Limpieza (por persona)".
+        </div>
+    }
 
     @if (mensajeCatalogo is not null)
     {
@@ -247,6 +253,10 @@ else
     private string? errorPago;
     private string? mensajeGuardado;
     private bool huboCambiosSinGuardar;
+    private bool avisoLimpieza;
+
+    // Se paga aparte con un sobre, no como línea de ticket.
+    private const string DescripcionArticuloLimpieza = "Limpieza (por persona)";
 
     private IJSObjectReference? moduloAviso;
 
@@ -278,6 +288,7 @@ else
             articulos = await db.Articulos
                 .AsNoTracking()
                 .Where(a => a.Activo != false)
+                .Where(a => a.Descripcion != DescripcionArticuloLimpieza)
                 .OrderBy(a => a.Descripcion)
                 .ToListAsync();
 
@@ -296,6 +307,11 @@ else
                 fecha = abierto.Fecha ?? DateTime.Now;
                 lineas = abierto.Lineas.ToList();
             }
+
+            var fechaTicket = DateOnly.FromDateTime(fecha);
+            avisoLimpieza = await db.Reservas.AsNoTracking()
+                .AnyAsync(r => r.SocioId == socioId && r.Fecha == fechaTicket
+                    && r.Estado == "activa" && r.Limpieza == true);
         }
         catch (Exception ex)
         {

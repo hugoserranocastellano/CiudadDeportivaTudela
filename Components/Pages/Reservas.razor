@@ -9,6 +9,7 @@
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
     <h1 class="mb-0">Reservas</h1>
+    <a class="btn btn-outline-secondary btn-sm ms-auto" href="mis-reservas">Mis reservas</a>
 </div>
 
 @if (error is not null)
@@ -315,6 +316,10 @@ else
         if (TieneReserva(celda))
         {
             clases.Add("dia-reserva");
+        }
+        if (celda == hoy)
+        {
+            clases.Add("dia-hoy");
         }
         return string.Join(' ', clases);
     }

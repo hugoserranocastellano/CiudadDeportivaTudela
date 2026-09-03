@@ -2,6 +2,21 @@
     border-radius: .5rem;
 }
 
+.calendario-reservas .dia-numero {
+    text-align: center;
+}
+
+.calendario-reservas td.dia-hoy {
+    background-color: #cfe8ff;
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
+}
+
+.calendario-reservas td.dia-hoy .dia-numero {
+    font-weight: 700;
+    color: #0d47a1;
+}
+
 .calendario-reservas td.dia-finde {
     background-color: #e9e9e9;
 }

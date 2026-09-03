@@ -134,6 +134,8 @@ else
                     <th role="button" @onclick='() => Ordenar("telefono")'>Teléfono@(Flecha("telefono"))</th>
                     <th role="button" @onclick='() => Ordenar("email")'>Email@(Flecha("email"))</th>
                     <th role="button" @onclick='() => Ordenar("alta")'>Alta@(Flecha("alta"))</th>
+                    <th role="button" @onclick='() => Ordenar("ultimoAcceso")'>Último acceso@(Flecha("ultimoAcceso"))</th>
+                    <th role="button" @onclick='() => Ordenar("validezPin")'>PIN actualizado@(Flecha("validezPin"))</th>
                     <th role="button" @onclick='() => Ordenar("activo")'>Activo@(Flecha("activo"))</th>
                     <th class="text-end">Acciones</th>
                 </tr>
@@ -156,6 +158,8 @@ else
                         <td>@socio.Telefono</td>
                         <td>@socio.Email</td>
                         <td>@socio.FechaAlta?.ToShortDateString()</td>
+                        <td>@(socio.UltimoAcceso?.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</td>
+                        <td>@(socio.ValidezPin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm"))</td>
                         <td>@(socio.Activo == true ? "Sí" : "No")</td>
                         <td class="text-end text-nowrap">
                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(socio)">Editar</button>
@@ -223,6 +227,8 @@ else
                 "telefono" => s => s.Telefono,
                 "email" => s => s.Email,
                 "alta" => s => s.FechaAlta,
+                "ultimoAcceso" => s => s.UltimoAcceso,
+                "validezPin" => s => s.ValidezPin,
                 "activo" => s => s.Activo,
                 _ => s => s.Nombre,
             };
@@ -338,6 +344,7 @@ else
                     if (digitos.Length >= 4 && long.TryParse(digitos[^4..], out var pinInicial))
                     {
                         edicion.PinHash = pinInicial;
+                        edicion.ValidezPin = DateTime.UtcNow;
                     }
                 }
 
