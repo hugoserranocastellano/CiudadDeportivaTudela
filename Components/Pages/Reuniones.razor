@@ -3,13 +3,17 @@
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SupabaseStorageService Storage
+@inject NavigationManager Nav
 
 <PageTitle>Reuniones</PageTitle>
 <JuntaGuard />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Reuniones</h1>
-    <button class="btn btn-pena" @onclick="Nuevo">Nueva reunión</button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("/eventos")'>Ver Calendario</button>
+        <button class="btn btn-pena" @onclick="Nuevo">Nueva reunión</button>
+    </div>
 </div>
 
 @if (error is not null)
@@ -50,10 +54,8 @@
             </div>
             <ValidationSummary class="mt-3 small" />
 
-            @if (!esNuevo)
-            {
-                <hr />
-                <h6 class="fw-semibold">Adjuntos</h6>
+            <hr />
+            <h6 class="fw-semibold">Adjuntos</h6>
 
                 @if (adjuntos.Count == 0)
                 {
@@ -92,10 +94,9 @@
                         </button>
                     </div>
                 </div>
-                @if (errorAdjunto is not null)
-                {
-                    <div class="text-danger small mt-2">@errorAdjunto</div>
-                }
+            @if (errorAdjunto is not null)
+            {
+                <div class="text-danger small mt-2">@errorAdjunto</div>
             }
         </div>
         <div class="card-footer d-flex gap-2">
@@ -196,18 +197,32 @@ else
         }
     }
 
-    private void Nuevo()
+    private async Task Nuevo()
     {
-        edicion = new Reunion
+        try
         {
-            FechaPrevista = DateOnly.FromDateTime(DateTime.Today),
-            TipoReunionId = tipos.FirstOrDefault()?.Id,
-            Visible = tipos.FirstOrDefault()?.Junta != true,
-        };
-        adjuntos = new List<AdjuntoReunion>();
-        esNuevo = true;
-        idBorrando = null;
-        LimpiarAdjuntoForm();
+            var nueva = new Reunion
+            {
+                FechaPrevista = DateOnly.FromDateTime(DateTime.Today),
+                TipoReunionId = tipos.FirstOrDefault()?.Id,
+                Visible = tipos.FirstOrDefault()?.Junta != true,
+            };
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Reuniones.Add(nueva);
+            await db.SaveChangesAsync();
+
+            edicion = nueva;
+            adjuntos = new List<AdjuntoReunion>();
+            esNuevo = true;
+            idBorrando = null;
+            LimpiarAdjuntoForm();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
     }
 
     private void AlAmbiarTipo()
@@ -237,8 +252,35 @@ else
         LimpiarAdjuntoForm();
     }
 
-    private void Cancelar()
+    private async Task Cancelar()
     {
+        if (esNuevo && edicion is not null)
+        {
+            try
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+
+                var rutasABorrar = await db.AdjuntosReunion
+                    .Where(a => a.ReunionId == edicion.Id)
+                    .Select(a => a.Url)
+                    .ToListAsync();
+
+                await db.AdjuntosReunion.Where(a => a.ReunionId == edicion.Id).ExecuteDeleteAsync();
+                await db.Reuniones.Where(r => r.Id == edicion.Id).ExecuteDeleteAsync();
+
+                foreach (var url in rutasABorrar)
+                {
+                    await BorrarDeStorageSiPropio(url);
+                }
+
+                await Cargar();
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+            }
+        }
+
         edicion = null;
         LimpiarAdjuntoForm();
     }
@@ -254,21 +296,13 @@ else
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            if (esNuevo)
-            {
-                db.Reuniones.Add(edicion);
-                await db.SaveChangesAsync();
-                esNuevo = false;
-            }
-            else
-            {
-                await db.Reuniones.Where(r => r.Id == edicion.Id)
-                    .ExecuteUpdateAsync(r => r
-                        .SetProperty(x => x.FechaPrevista, edicion.FechaPrevista)
-                        .SetProperty(x => x.Titulo, edicion.Titulo)
-                        .SetProperty(x => x.TipoReunionId, edicion.TipoReunionId)
-                        .SetProperty(x => x.Visible, edicion.Visible));
-            }
+            await db.Reuniones.Where(r => r.Id == edicion.Id)
+                .ExecuteUpdateAsync(r => r
+                    .SetProperty(x => x.FechaPrevista, edicion.FechaPrevista)
+                    .SetProperty(x => x.Titulo, edicion.Titulo)
+                    .SetProperty(x => x.TipoReunionId, edicion.TipoReunionId)
+                    .SetProperty(x => x.Visible, edicion.Visible));
+            esNuevo = false;
 
             await Cargar();
             var actualizada = reuniones!.FirstOrDefault(r => r.Id == edicion.Id);
