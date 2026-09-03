@@ -315,11 +315,25 @@ else
         await js.InvokeVoidAsync(huboCambiosSinGuardar ? "activar" : "desactivar");
     }
 
-    private void MarcarSinGuardar()
+    /// <summary>
+    /// Guarda cada cambio (añadir, quitar, cambiar cantidad) al instante y sin
+    /// avisos visibles. Un socio puede tardar hasta una hora en ir apuntando
+    /// cosas al ticket, y en móvil basta con bloquear la pantalla un rato para
+    /// que Blazor Server dé por muerto el circuito y descarte lo que solo
+    /// estuviera en memoria — así nunca hay nada que solo viva ahí. El botón
+    /// "Guardar" sigue existiendo como confirmación explícita para el socio,
+    /// pero ya no es la única red de seguridad.
+    /// </summary>
+    private async Task GuardarSilenciosoAsync()
     {
-        huboCambiosSinGuardar = true;
         mensajeGuardado = null;
-        _ = ActualizarAvisoSalida();
+        huboCambiosSinGuardar = true;
+        await PersistirAsync();
+        if (error is null)
+        {
+            huboCambiosSinGuardar = false;
+        }
+        await ActualizarAvisoSalida();
     }
 
     private async Task ConfirmarSalida(LocationChangingContext context)
@@ -338,7 +352,7 @@ else
         }
     }
 
-    private void IntentarAnadirPorTexto()
+    private async Task IntentarAnadirPorTexto()
     {
         if (string.IsNullOrWhiteSpace(filtro))
         {
@@ -356,7 +370,7 @@ else
             return;
         }
 
-        Anadir(articulo);
+        await Anadir(articulo);
         filtro = string.Empty;
         error = null;
     }
@@ -367,7 +381,7 @@ else
 
     private async Task AnadirDesdeCatalogo(Articulo articulo)
     {
-        Anadir(articulo);
+        await Anadir(articulo);
         mensajeCatalogo = $"«{articulo.Descripcion}» añadido.";
 
         var token = ++tokenMensajeCatalogo;
@@ -381,9 +395,8 @@ else
         }
     }
 
-    private void Anadir(Articulo articulo)
+    private async Task Anadir(Articulo articulo)
     {
-        MarcarSinGuardar();
         var existente = lineas.FirstOrDefault(l => l.ArticuloId == articulo.Id);
         if (existente is not null)
         {
@@ -401,9 +414,11 @@ else
                 Subtotal = articulo.PrecioUnidad,
             });
         }
+
+        await GuardarSilenciosoAsync();
     }
 
-    private void CambiarCantidad(TicketLinea linea, int delta)
+    private async Task CambiarCantidad(TicketLinea linea, int delta)
     {
         var nuevasUnidades = (linea.Unidades ?? 1) + delta;
         if (nuevasUnidades < 1)
@@ -413,13 +428,13 @@ else
 
         linea.Unidades = nuevasUnidades;
         linea.Subtotal = (linea.PrecioUnidad ?? 0) * nuevasUnidades;
-        MarcarSinGuardar();
+        await GuardarSilenciosoAsync();
     }
 
-    private void EliminarLinea(TicketLinea linea)
+    private async Task EliminarLinea(TicketLinea linea)
     {
         lineas.Remove(linea);
-        MarcarSinGuardar();
+        await GuardarSilenciosoAsync();
     }
 
     private async Task Guardar()
