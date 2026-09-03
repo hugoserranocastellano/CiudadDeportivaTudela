@@ -72,6 +72,25 @@
                     <label class="form-label">Nº de cuenta</label>
                     <InputText class="form-control" @bind-Value="edicion.NumeroCuenta" />
                 </div>
+                @if (!esNuevo)
+                {
+                    <div class="col-md-4">
+                        <label class="form-label">PIN de acceso</label>
+                        <div class="input-group">
+                            <input class="form-control" maxlength="4" inputmode="numeric" placeholder="4 dígitos"
+                                   value="@nuevoPin" @oninput="e => nuevoPin = e.Value?.ToString() ?? string.Empty" />
+                            <button type="button" class="btn btn-outline-secondary"
+                                    @onclick="() => nuevoPin = SocioAuth.SoloDigitos(edicion!.Telefono) is var d && d.Length >= 4 ? d[^4..] : string.Empty">
+                                Usar últimos 4 del teléfono
+                            </button>
+                        </div>
+                        <div class="form-text">Déjalo en blanco para no cambiarlo. No hace falta el PIN antiguo.</div>
+                        @if (!string.IsNullOrEmpty(nuevoPin) && !SocioAuth.PinValido(nuevoPin))
+                        {
+                            <div class="text-danger small">El PIN debe tener exactamente 4 dígitos.</div>
+                        }
+                    </div>
+                }
                 <div class="col-md-4">
                     <label class="form-label">Foto</label>
                     @if (esNuevo)
@@ -186,6 +205,7 @@ else
     private Socio? edicion;
     private bool esNuevo;
     private bool activo = true;
+    private string nuevoPin = string.Empty;
     private long? idBorrando;
     private string filtro = string.Empty;
     private string? error;
@@ -292,6 +312,7 @@ else
         };
         activo = true;
         esNuevo = true;
+        nuevoPin = string.Empty;
         idBorrando = null;
     }
 
@@ -316,6 +337,7 @@ else
         };
         activo = socio.Activo != false;
         esNuevo = false;
+        nuevoPin = string.Empty;
         idBorrando = null;
     }
 
@@ -329,6 +351,18 @@ else
         }
 
         edicion.Activo = activo;
+
+        if (!esNuevo && !string.IsNullOrEmpty(nuevoPin))
+        {
+            if (!SocioAuth.PinValido(nuevoPin))
+            {
+                error = "El PIN debe tener exactamente 4 dígitos.";
+                return;
+            }
+
+            edicion.PinHash = long.Parse(nuevoPin);
+            edicion.ValidezPin = DateTime.UtcNow;
+        }
 
         try
         {
