@@ -367,8 +367,8 @@ else
             var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
             dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
 
-            var desde = primerDia.ToDateTime(TimeOnly.MinValue);
-            var hasta = ultimoDia.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var desde = DateTime.SpecifyKind(primerDia.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+            var hasta = DateTime.SpecifyKind(ultimoDia.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             var eventosDelMes = await db.Eventos
                 .AsNoTracking()
                 .Where(e => e.Fecha >= desde && e.Fecha < hasta)
@@ -588,7 +588,7 @@ else
             return;
         }
 
-        edicion = new Evento { Fecha = diaSeleccionado.Value.ToDateTime(TimeOnly.MinValue) };
+        edicion = new Evento { Fecha = DateTime.SpecifyKind(diaSeleccionado.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc) };
         obligatorio = false;
         errorForm = null;
     }

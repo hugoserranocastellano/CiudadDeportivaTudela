@@ -250,7 +250,7 @@ else
 
             socio = await db.Socios.AsNoTracking().FirstOrDefaultAsync(s => s.Id == socioId);
 
-            var hoy = DateTime.Today;
+            var hoy = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
             eventos = await db.Eventos
                 .AsNoTracking()
                 .Where(e => e.Fecha >= hoy)
