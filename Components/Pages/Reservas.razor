@@ -262,6 +262,7 @@ else
     private DateOnly mesActual;
     private List<DateOnly>? dias;
     private Dictionary<(DateOnly, long), int> ocupacion = new();
+    private HashSet<DateOnly> diasConReservaPropia = new();
     private int aforoTotal;
     private List<Opcion> socios = new();
     private List<TipoReserva> tipos = new();
@@ -316,6 +317,10 @@ else
         if (TieneReserva(celda))
         {
             clases.Add("dia-reserva");
+        }
+        if (diasConReservaPropia.Contains(celda))
+        {
+            clases.Add("dia-reserva-propia");
         }
         if (celda == hoy)
         {
@@ -434,6 +439,16 @@ else
             ocupacion = filas
                 .GroupBy(f => (f.Fecha, f.TipoReservaId))
                 .ToDictionary(g => g.Key, g => g.Sum(f => f.Ocupacion));
+
+            diasConReservaPropia = socioId is null
+                ? new HashSet<DateOnly>()
+                : (await db.Reservas
+                    .AsNoTracking()
+                    .Where(r => r.Estado == "activa" && r.SocioId == socioId
+                        && r.Fecha >= primerDia && r.Fecha <= ultimoDia)
+                    .Select(r => r.Fecha)
+                    .ToListAsync())
+                    .ToHashSet();
 
             tipos = await db.TiposReserva
                 .AsNoTracking()

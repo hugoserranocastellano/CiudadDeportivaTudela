@@ -16,6 +16,8 @@ public class Reserva
 
     public bool? Limpieza { get; set; } = false;
 
+    public bool? PagadaLimpieza { get; set; } = false;
+
     public long? TipoReservaId { get; set; }
 
     public TipoReserva? TipoReserva { get; set; }

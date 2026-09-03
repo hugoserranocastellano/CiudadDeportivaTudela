@@ -150,19 +150,29 @@ else
                 <div class="row row-cols-2 row-cols-md-4 g-3">
                     @foreach (var a in articulos)
                     {
-                        <div class="col text-center" role="button" style="cursor:pointer" @ondblclick="() => AnadirDesdeCatalogo(a)">
-                            @if (!string.IsNullOrWhiteSpace(a.UrlFoto))
-                            {
-                                <img src="@a.UrlFoto" alt="@a.Descripcion" style="width:100%;max-width:100px;height:100px;object-fit:cover;" class="rounded" />
-                            }
-                            else
-                            {
-                                <div class="bg-light rounded mx-auto" style="width:100px;height:100px;"></div>
-                            }
+                        var unidadesEnTicket = UnidadesDe(a);
+                        <div class="col text-center @(unidadesEnTicket > 0 ? "articulo-anadido" : null)" role="button" style="cursor:pointer" @ondblclick="() => AnadirDesdeCatalogo(a)">
+                            <div class="position-relative d-inline-block">
+                                @if (!string.IsNullOrWhiteSpace(a.UrlFoto))
+                                {
+                                    <img src="@a.UrlFoto" alt="@a.Descripcion" style="width:100%;max-width:100px;height:100px;object-fit:cover;" class="rounded" />
+                                }
+                                else
+                                {
+                                    <div class="bg-light rounded mx-auto" style="width:100px;height:100px;"></div>
+                                }
+                                @if (unidadesEnTicket > 0)
+                                {
+                                    <span class="badge rounded-pill text-bg-success position-absolute top-0 start-100 translate-middle">@unidadesEnTicket</span>
+                                }
+                            </div>
                             <div class="small mt-1">@a.Descripcion</div>
                             <div class="small text-muted">@a.PrecioUnidad.ToString("0.00")€</div>
                         </div>
                     }
+                </div>
+                <div class="text-end mt-3">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => verArticulos = false">← Volver</button>
                 </div>
             </div>
         </div>
@@ -263,6 +273,9 @@ else
     private decimal Total => lineas.Sum(l => l.Subtotal ?? 0);
 
     private static string Etiqueta(Articulo a) => $"{a.Descripcion} ({a.PrecioUnidad.ToString("0.00")}€)";
+
+    private int UnidadesDe(Articulo a) =>
+        lineas.FirstOrDefault(l => l.ArticuloId == a.Id)?.Unidades ?? 0;
 
     protected override async Task OnInitializedAsync()
     {

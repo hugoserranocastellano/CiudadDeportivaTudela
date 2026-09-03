@@ -133,6 +133,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.SocioId).HasColumnName("socio_id");
             entity.Property(e => e.Comensales).HasColumnName("comensales");
             entity.Property(e => e.Limpieza).HasColumnName("limpieza");
+            entity.Property(e => e.PagadaLimpieza).HasColumnName("PagadaLimpieza");
             entity.Property(e => e.TipoReservaId).HasColumnName("tipo_reserva");
             entity.Property(e => e.Estado).HasColumnName("estado");
             // El default de la columna es now(): así EF omite created_at al insertar null.
