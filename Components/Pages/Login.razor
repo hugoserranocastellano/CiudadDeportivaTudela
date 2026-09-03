@@ -28,14 +28,16 @@
     <div class="mb-3">
         <label for="telefono" class="form-label">Teléfono</label>
         <InputText id="telefono" class="form-control" @bind-Value="Entrada!.Telefono"
-                   autocomplete="username" placeholder="Tu número de teléfono" />
+                   autocomplete="username" placeholder="Tu número de teléfono"
+                   inputmode="tel" />
         <ValidationMessage For="() => Entrada!.Telefono" class="small" />
     </div>
 
     <div class="mb-4">
         <label for="pin" class="form-label">PIN</label>
         <InputText id="pin" type="password" class="form-control" @bind-Value="Entrada!.Pin"
-                   autocomplete="current-password" placeholder="Tu PIN" maxlength="4" />
+                   autocomplete="current-password" placeholder="Tu PIN" maxlength="4"
+                   inputmode="numeric" pattern="[0-9]*" />
         <ValidationMessage For="() => Entrada!.Pin" class="small" />
         <div class="form-text">Tu contraseña es el PIN que tiene la peña registrado.</div>
     </div>
