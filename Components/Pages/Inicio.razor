@@ -135,7 +135,7 @@ else
             <span class="fw-semibold">Sugerencias</span>
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-sm btn-pena btn-accion" @onclick="AbrirNuevaSugerencia">Enviar sugerencia</button>
-                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/mis-sugerencias"))">Historial</button>
+                <button class="btn btn-sm btn-outline-secondary btn-accion" @onclick="@(() => Navegacion.NavigateTo("/sugerencias"))">Historial</button>
             </div>
         </div>
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -152,7 +152,9 @@ else
             <DataAnnotationsValidator />
             <div class="card-header fw-semibold">Enviar sugerencia</div>
             <div class="card-body">
-                <label class="form-label">Tu sugerencia</label>
+                <label class="form-label">Título</label>
+                <InputText class="form-control mb-3" @bind-Value="nuevaSugerencia!.Titulo" />
+                <label class="form-label">Detalle</label>
                 <InputTextArea class="form-control" rows="4" @bind-Value="nuevaSugerencia!.Descripcion" />
                 <ValidationSummary class="mt-3 small" />
             </div>
@@ -181,7 +183,7 @@ else
                 <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
                         <div class="fw-semibold">@evento.Descripcion</div>
-                        <div class="text-muted small">@evento.Fecha?.ToString("dd/MM/yyyy")</div>
+                        <div class="text-muted small">@evento.Fecha.ToString("dd/MM/yyyy")</div>
                     </div>
                     @if (inscrito.Contains(evento.Id))
                     {
@@ -248,8 +250,10 @@ else
 
             socio = await db.Socios.AsNoTracking().FirstOrDefaultAsync(s => s.Id == socioId);
 
+            var hoy = DateOnly.FromDateTime(DateTime.Today);
             eventos = await db.Eventos
                 .AsNoTracking()
+                .Where(e => e.Fecha >= hoy)
                 .OrderBy(e => e.Fecha)
                 .ToListAsync();
 

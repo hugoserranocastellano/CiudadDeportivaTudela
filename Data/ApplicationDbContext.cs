@@ -266,6 +266,7 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Titulo).HasColumnName("TituloSugerencia");
             entity.Property(e => e.Descripcion).HasColumnName("descripcion").IsRequired();
             entity.Property(e => e.SocioId).HasColumnName("socio_id");
             entity.Property(e => e.Fecha).HasColumnName("fecha").HasDefaultValueSql("now()");
@@ -295,7 +296,10 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Descripcion).HasColumnName("descripcion").IsRequired();
-            entity.Property(e => e.Fecha).HasColumnName("fecha");
+            entity.Property(e => e.Fecha).HasColumnName("fecha").HasColumnType("date");
+            entity.Property(e => e.Caracteristicas).HasColumnName("caracteristicas");
+            entity.Property(e => e.Obligatorio).HasColumnName("obligatorio");
+            entity.Property(e => e.PlazasMaximas).HasColumnName("plazas_maximas");
         });
 
     }

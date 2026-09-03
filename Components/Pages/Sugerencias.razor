@@ -4,7 +4,6 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <PageTitle>Sugerencias</PageTitle>
-<JuntaGuard />
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="mb-0">Sugerencias</h1>
@@ -20,36 +19,20 @@
 {
     <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
         <DataAnnotationsValidator />
-        <div class="card-header fw-semibold">@(esNuevo ? "Nueva sugerencia" : $"Editar sugerencia #{edicion.Id}")</div>
+        <div class="card-header fw-semibold">Nueva sugerencia</div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Socio</label>
-                    <InputSelect class="form-select" @bind-Value="edicion.SocioId">
-                        <option value="">(anónima)</option>
-                        @foreach (var socio in socios)
-                        {
-                            <option value="@socio.Id">@socio.Texto</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <div class="form-check">
-                        <InputCheckbox class="form-check-input" @bind-Value="visible" id="sugVisible" />
-                        <label class="form-check-label" for="sugVisible">Visible para los socios</label>
-                    </div>
+                <div class="col-12">
+                    <label class="form-label">Título</label>
+                    <InputText class="form-control" @bind-Value="edicion.Titulo" />
+                    <ValidationMessage For="() => edicion.Titulo" class="small" />
                 </div>
                 <div class="col-12">
-                    <label class="form-label">Sugerencia</label>
-                    <InputTextArea class="form-control" rows="3" @bind-Value="edicion.Descripcion" />
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Respuesta de la junta</label>
-                    <InputTextArea class="form-control" rows="3" @bind-Value="respuesta" />
-                    <div class="form-text">Al guardar una respuesta nueva se anota la fecha automáticamente.</div>
+                    <label class="form-label">Detalle</label>
+                    <InputTextArea class="form-control" rows="4" @bind-Value="edicion.Descripcion" />
+                    <ValidationMessage For="() => edicion.Descripcion" class="small" />
                 </div>
             </div>
-            <ValidationSummary class="mt-3 small" />
         </div>
         <div class="card-footer d-flex gap-2">
             <button type="submit" class="btn btn-pena">Guardar</button>
@@ -58,87 +41,108 @@
     </EditForm>
 }
 
+<div class="mb-3">
+    <input class="form-control" placeholder="Buscar por socio, título, detalle o respuesta..."
+           @bind="busqueda" @bind:event="oninput" />
+</div>
+
 @if (sugerencias is null)
 {
     <p><em>Cargando...</em></p>
 }
-else if (sugerencias.Count == 0)
+else if (Filtradas.Count == 0)
 {
-    <p><em>No hay sugerencias registradas.</em></p>
+    <p><em>No hay sugerencias que coincidan con la búsqueda.</em></p>
 }
 else
 {
-    <p class="text-muted">
-        @sugerencias.Count sugerencia(s),
-        @(sugerencias.Count(s => string.IsNullOrWhiteSpace(s.Respuesta))) sin responder.
-    </p>
+    <div class="d-flex flex-column gap-2">
+        @foreach (var s in Filtradas)
+        {
+            var respondida = !string.IsNullOrWhiteSpace(s.Respuesta);
+            var expandida = idExpandido == s.Id;
+            <div class="card">
+                <div class="card-body py-2 d-flex align-items-center gap-3" role="button" @onclick="() => Expandir(s.Id)">
+                    @if (!string.IsNullOrWhiteSpace(s.SocioFoto))
+                    {
+                        <img src="@s.SocioFoto" alt="@s.SocioNombre" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;flex-shrink:0;" />
+                    }
+                    else
+                    {
+                        <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width:40px;height:40px;flex-shrink:0;">?</div>
+                    }
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">@s.Titulo</div>
+                        <div class="small text-muted">@s.SocioNombre · @s.Fecha?.ToString("dd/MM/yyyy")</div>
+                    </div>
+                    @if (respondida)
+                    {
+                        <span class="badge text-bg-success" title="Respondida">✓</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-secondary" title="Pendiente de respuesta">Pte.</span>
+                    }
+                </div>
 
-    <div class="table-responsive tabla-marco">
-        <table class="table table-striped align-middle">
-            <thead>
-                <tr>
-                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
-                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
-                    <th role="button" @onclick='() => Ordenar("socio")'>Socio@(Flecha("socio"))</th>
-                    <th role="button" @onclick='() => Ordenar("sugerencia")'>Sugerencia@(Flecha("sugerencia"))</th>
-                    <th role="button" @onclick='() => Ordenar("respuesta")'>Respuesta@(Flecha("respuesta"))</th>
-                    <th role="button" @onclick='() => Ordenar("visible")'>Visible@(Flecha("visible"))</th>
-                    <th class="text-end">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var sugerencia in Ordenados)
+                @if (expandida)
                 {
-                    <tr class="@(string.IsNullOrWhiteSpace(sugerencia.Respuesta) ? "table-warning" : null)">
-                        <td>@sugerencia.Id</td>
-                        <td>@sugerencia.Fecha?.ToString("dd/MM/yyyy")</td>
-                        <td>@NombreSocio(sugerencia.SocioId)</td>
-                        <td>@sugerencia.Descripcion</td>
-                        <td>
-                            @sugerencia.Respuesta
-                            @if (sugerencia.FechaRespuesta is not null)
-                            {
-                                <div class="text-muted small">@sugerencia.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
-                            }
-                        </td>
-                        <td>@(sugerencia.Visible == true ? "Sí" : "No")</td>
-                        <td class="text-end text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(sugerencia.Id)">Editar</button>
-                            @if (idBorrando == sugerencia.Id)
-                            {
-                                <button class="btn btn-sm btn-danger" @onclick="() => Borrar(sugerencia.Id)">Confirmar</button>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = sugerencia.Id">Borrar</button>
-                            }
-                        </td>
-                    </tr>
+                    <div class="card-body border-top pt-3">
+                        <p class="mb-3" style="white-space:pre-wrap;">@s.Descripcion</p>
+
+                        @if (respondida)
+                        {
+                            <div class="alert alert-success mb-3">
+                                <div class="fw-semibold mb-1">Respuesta de la junta</div>
+                                <div style="white-space:pre-wrap;">@s.Respuesta</div>
+                                @if (s.FechaRespuesta is not null)
+                                {
+                                    <div class="small text-muted mt-1">@s.FechaRespuesta?.ToString("dd/MM/yyyy")</div>
+                                }
+                            </div>
+                        }
+
+                        @if (esJunta)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label">@(respondida ? "Editar respuesta" : "Responder")</label>
+                                <textarea class="form-control" rows="3" @bind="textoRespuesta"></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-pena" @onclick="() => Responder(s.Id)">Guardar respuesta</button>
+                                @if (idBorrando == s.Id)
+                                {
+                                    <button class="btn btn-sm btn-danger" @onclick="() => Borrar(s.Id)">Confirmar borrado</button>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = s.Id">Borrar</button>
+                                }
+                            </div>
+                        }
+                    </div>
                 }
-            </tbody>
-        </table>
+            </div>
+        }
     </div>
 }
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private long? socioId;
+    private bool esJunta;
     private List<Fila>? sugerencias;
-    private List<Opcion> socios = new();
-    private Dictionary<long, string> nombresSocio = new();
     private Sugerencia? edicion;
-    private bool esNuevo;
-    private bool visible = true;
-    private string? respuesta;
+    private long? idExpandido;
     private long? idBorrando;
+    private string? textoRespuesta;
+    private string busqueda = string.Empty;
     private string? error;
 
-    private string NombreSocio(long? id) =>
-        id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "Anónima";
-
-    private string ordenCampo = "fecha";
-    private bool ordenDescendente = true;
-
-    private List<Fila> Ordenados
+    private List<Fila> Filtradas
     {
         get
         {
@@ -147,57 +151,43 @@ else
                 return new List<Fila>();
             }
 
-            Func<Fila, object?> clave = ordenCampo switch
+            var texto = busqueda.Trim();
+            if (texto.Length == 0)
             {
-                "id" => s => s.Id,
-                "socio" => s => NombreSocio(s.SocioId),
-                "sugerencia" => s => s.Descripcion,
-                "respuesta" => s => s.Respuesta,
-                "visible" => s => s.Visible,
-                _ => s => s.Fecha,
-            };
+                return sugerencias;
+            }
 
-            IEnumerable<Fila> resultado = ordenDescendente
-                ? sugerencias.OrderByDescending(clave)
-                : sugerencias.OrderBy(clave);
-
-            return resultado.ToList();
+            return sugerencias.Where(s =>
+                    Contiene(s.SocioNombre, texto) ||
+                    Contiene(s.Titulo, texto) ||
+                    Contiene(s.Descripcion, texto) ||
+                    Contiene(s.Respuesta, texto))
+                .ToList();
         }
     }
 
-    private void Ordenar(string campo)
+    private static bool Contiene(string? campo, string texto) =>
+        !string.IsNullOrEmpty(campo) && campo.Contains(texto, StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
     {
-        if (ordenCampo == campo)
+        if (EstadoAutenticacion is null)
         {
-            ordenDescendente = !ordenDescendente;
+            return;
         }
-        else
-        {
-            ordenCampo = campo;
-            ordenDescendente = false;
-        }
+
+        var estado = await EstadoAutenticacion;
+        socioId = SocioAuth.SocioId(estado.User);
+        esJunta = SocioAuth.EsJunta(estado.User);
+
+        await Cargar();
     }
-
-    private string Flecha(string campo) =>
-        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
-
-    protected override Task OnInitializedAsync() => Cargar();
 
     private async Task Cargar()
     {
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-
-            socios = (await db.Socios
-                    .AsNoTracking()
-                    .OrderBy(s => s.Nombre)
-                    .Select(s => new { s.Id, s.Dni, s.Nombre, s.Apellidos })
-                    .ToListAsync())
-                .Select(s => new Opcion(s.Id, $"{s.Dni} · {s.Nombre} {s.Apellidos}".TrimEnd()))
-                .ToList();
-
-            nombresSocio = socios.ToDictionary(s => s.Id, s => s.Texto);
 
             sugerencias = await db.Sugerencias
                 .AsNoTracking()
@@ -206,11 +196,12 @@ else
                 .Select(s => new Fila(
                     s.Id,
                     s.Fecha,
-                    s.SocioId,
+                    s.Titulo,
                     s.Descripcion,
                     s.Respuesta,
                     s.FechaRespuesta,
-                    s.Visible))
+                    s.Socio != null ? $"{s.Socio.Nombre} {s.Socio.Apellidos}".Trim() : "Anónima",
+                    s.Socio != null ? s.Socio.UrlFoto : null))
                 .ToListAsync();
 
             error = null;
@@ -224,30 +215,8 @@ else
 
     private void Nuevo()
     {
-        edicion = new Sugerencia();
-        visible = true;
-        respuesta = null;
-        esNuevo = true;
-        idBorrando = null;
-    }
-
-    private async Task Editar(long id)
-    {
-        idBorrando = null;
-
-        try
-        {
-            await using var db = await DbFactory.CreateDbContextAsync();
-
-            edicion = await db.Sugerencias.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id);
-            visible = edicion?.Visible != false;
-            respuesta = edicion?.Respuesta;
-            esNuevo = false;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
+        edicion = new Sugerencia { SocioId = socioId };
+        idExpandido = null;
     }
 
     private void Cancelar() => edicion = null;
@@ -259,35 +228,52 @@ else
             return;
         }
 
-        edicion.Visible = visible;
-
-        // Sólo se sella la fecha cuando la respuesta cambia: reeditar una errata
-        // no debería mover la fecha original.
-        var textoRespuesta = string.IsNullOrWhiteSpace(respuesta) ? null : respuesta.Trim();
-
-        if (textoRespuesta != edicion.Respuesta)
-        {
-            edicion.Respuesta = textoRespuesta;
-            edicion.FechaRespuesta = textoRespuesta is null
-                ? null
-                : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
-        }
+        edicion.SocioId = socioId;
 
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            if (esNuevo)
-            {
-                db.Sugerencias.Add(edicion);
-            }
-            else
-            {
-                db.Sugerencias.Update(edicion);
-            }
-
+            db.Sugerencias.Add(edicion);
             await db.SaveChangesAsync();
+
             edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void Expandir(long id)
+    {
+        if (idExpandido == id)
+        {
+            idExpandido = null;
+            return;
+        }
+
+        idExpandido = id;
+        idBorrando = null;
+        textoRespuesta = sugerencias?.FirstOrDefault(s => s.Id == id)?.Respuesta;
+    }
+
+    private async Task Responder(long id)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var texto = string.IsNullOrWhiteSpace(textoRespuesta) ? null : textoRespuesta.Trim();
+
+            await db.Sugerencias.Where(s => s.Id == id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(s => s.Respuesta, texto)
+                    .SetProperty(s => s.FechaRespuesta, texto is null
+                        ? null
+                        : DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified)));
+
             await Cargar();
         }
         catch (Exception ex)
@@ -305,6 +291,7 @@ else
             await using var db = await DbFactory.CreateDbContextAsync();
 
             await db.Sugerencias.Where(s => s.Id == id).ExecuteDeleteAsync();
+            idExpandido = null;
             await Cargar();
         }
         catch (Exception ex)
@@ -316,11 +303,10 @@ else
     private record Fila(
         long Id,
         DateTime? Fecha,
-        long? SocioId,
+        string Titulo,
         string Descripcion,
         string? Respuesta,
         DateTime? FechaRespuesta,
-        bool? Visible);
-
-    private record Opcion(long Id, string Texto);
+        string SocioNombre,
+        string? SocioFoto);
 }

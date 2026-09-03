@@ -1,0 +1,70 @@
+.calendario-eventos td {
+    border-radius: .5rem;
+}
+
+.calendario-eventos .dia-numero {
+    text-align: center;
+}
+
+.calendario-eventos td.dia-hoy {
+    background-color: #cfe8ff;
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
+}
+
+.calendario-eventos td.dia-hoy .dia-numero {
+    font-weight: 700;
+    color: #0d47a1;
+}
+
+.calendario-eventos td.dia-evento-opcional {
+    background-color: #d6ecff;
+}
+
+.calendario-eventos td.dia-evento-opcional .dia-numero {
+    font-weight: 700;
+    color: #0b5ed7;
+}
+
+.calendario-eventos td.dia-evento-obligatorio {
+    background-color: #f8d7da;
+}
+
+.calendario-eventos td.dia-evento-obligatorio .dia-numero {
+    font-weight: 700;
+    color: #b02a37;
+}
+
+.dia-punto {
+    display: inline-block;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background-color: currentColor;
+    margin-left: .25rem;
+    vertical-align: middle;
+}
+
+.leyenda-punto {
+    display: inline-block;
+    width: .6rem;
+    height: .6rem;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.leyenda-obligatorio {
+    background-color: #b02a37;
+}
+
+.leyenda-opcional {
+    background-color: #0b5ed7;
+}
+
+.evento-card.evento-obligatorio {
+    border-left: 4px solid #b02a37;
+}
+
+.evento-card.evento-opcional {
+    border-left: 4px solid #0b5ed7;
+}

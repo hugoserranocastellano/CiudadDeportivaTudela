@@ -6,6 +6,9 @@ public class Sugerencia
 {
     public long Id { get; set; }
 
+    [Required(ErrorMessage = "El título es obligatorio.")]
+    public string Titulo { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "La descripción es obligatoria.")]
     public string Descripcion { get; set; } = string.Empty;
 

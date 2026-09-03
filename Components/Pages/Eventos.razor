@@ -1,0 +1,652 @@
+@page "/eventos"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Globalization
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Eventos</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0">Eventos</h1>
+    <a class="btn btn-outline-secondary btn-sm ms-auto" href="mis-eventos">Mis eventos</a>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+<p class="text-muted small">
+    <span class="leyenda-punto leyenda-obligatorio"></span> Obligatorio
+    <span class="leyenda-punto leyenda-opcional ms-3"></span> Opcional
+</p>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <button class="btn btn-outline-secondary" @onclick="MesAnterior">← Mes anterior</button>
+    <div class="text-center flex-grow-1">
+        <div class="h4 mb-0 text-capitalize">@mesActual.ToString("MMMM", CultureInfo.GetCultureInfo("es-ES"))</div>
+        <div class="text-muted">@mesActual.Year</div>
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="MesSiguiente">Mes siguiente →</button>
+</div>
+
+@if (dias is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered calendario-eventos align-top">
+            <thead>
+                <tr>
+                    @foreach (var nombreDia in nombresDias)
+                    {
+                        <th class="text-center">@nombreDia</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var semana in Semanas())
+                {
+                    <tr>
+                        @foreach (var dia in semana)
+                        {
+                            @if (dia is null)
+                            {
+                                <td class="bg-light"></td>
+                            }
+                            else
+                            {
+                                var celda = dia.Value;
+                                <td class="@ClaseDia(celda)" style="cursor:pointer" @onclick="() => AbrirDia(celda)">
+                                    <div class="dia-numero">
+                                        @celda.Day
+                                        @if (TieneEvento(celda))
+                                        {
+                                            <span class="dia-punto"></span>
+                                        }
+                                    </div>
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (diaSeleccionado is not null)
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">@diaSeleccionado.Value.ToString("dddd, d 'de' MMMM", CultureInfo.GetCultureInfo("es-ES"))</span>
+            <button class="btn-close" @onclick="CerrarDia" aria-label="Cerrar"></button>
+        </div>
+        <div class="card-body">
+            @if (eventosDelDia is null)
+            {
+                <p><em>Cargando...</em></p>
+            }
+            else if (eventosDelDia.Count == 0)
+            {
+                <p class="text-muted">No hay eventos este día.</p>
+            }
+            else
+            {
+                @foreach (var ev in eventosDelDia)
+                {
+                    var ocupadas = ocupacion.TryGetValue(ev.Id, out var oc) ? oc : 0;
+                    var disponibles = ev.PlazasMaximas is int max ? Math.Max(0, max - ocupadas) : (int?)null;
+                    var propia = inscripcionPropia.TryGetValue(ev.Id, out var insc) ? insc : null;
+
+                    <div class="card mb-3 evento-card @(ev.Obligatorio == true ? "evento-obligatorio" : "evento-opcional")">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="mb-1">
+                                    @ev.Descripcion
+                                    <span class="badge @(ev.Obligatorio == true ? "text-bg-danger" : "text-bg-info")">
+                                        @(ev.Obligatorio == true ? "Obligatorio" : "Opcional")
+                                    </span>
+                                </h5>
+                                @if (esJunta)
+                                {
+                                    @if (idBorrando == ev.Id)
+                                    {
+                                        <span>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => BorrarEvento(ev.Id)">Confirmar</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = ev.Id">Borrar</button>
+                                    }
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(ev.Caracteristicas))
+                            {
+                                <p class="mb-2">@ev.Caracteristicas</p>
+                            }
+                            <p class="text-muted small mb-2">
+                                @if (disponibles is not null)
+                                {
+                                    <text>Plazas libres: @disponibles / @ev.PlazasMaximas</text>
+                                }
+                                else
+                                {
+                                    <text>Sin límite de plazas</text>
+                                }
+                                · @ocupadas inscrito(s)
+                            </p>
+
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => AlternarInscritos(ev.Id)">
+                                    @(eventoInscritosAbierto == ev.Id ? "Ocultar inscritos" : "Ver inscritos")
+                                </button>
+
+                                @if (propia is null)
+                                {
+                                    <button class="btn btn-sm btn-pena" @onclick="() => Inscribirse(ev.Id)">Inscribirse</button>
+                                }
+                                else
+                                {
+                                    <span class="align-self-center small text-muted">
+                                        @(propia.ListaEspera == true ? "En lista de espera" : "Inscrito")
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Baja(ev.Id)">Darme de baja</button>
+                                }
+                            </div>
+
+                            @if (eventoInscritosAbierto == ev.Id)
+                            {
+                                @if (!inscritosPorEvento.TryGetValue(ev.Id, out var inscritos))
+                                {
+                                    <p class="text-muted small"><em>Cargando...</em></p>
+                                }
+                                else if (inscritos.Count == 0)
+                                {
+                                    <p class="text-muted small">Nadie inscrito todavía.</p>
+                                }
+                                else
+                                {
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach (var i in inscritos)
+                                        {
+                                            <div class="d-flex align-items-center gap-2 border rounded p-2 @(i.ListaEspera == true ? "bg-warning-subtle" : null)">
+                                                @if (!string.IsNullOrWhiteSpace(i.SocioFoto))
+                                                {
+                                                    <img src="@i.SocioFoto" alt="@i.SocioNombre" class="rounded-circle" style="width:36px;height:36px;object-fit:cover;" />
+                                                }
+                                                else
+                                                {
+                                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width:36px;height:36px;">?</div>
+                                                }
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-semibold">@i.SocioNombre @(i.ListaEspera == true ? " (lista de espera)" : "")</div>
+                                                    <div class="small text-muted">
+                                                        @i.FechaInscripcion?.ToString("dd/MM/yyyy HH:mm")
+                                                        @if (!string.IsNullOrWhiteSpace(i.SocioTelefono))
+                                                        {
+                                                            <text> · Tfno: @i.SocioTelefono</text>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (esJunta)
+            {
+                @if (edicion is null)
+                {
+                    <button class="btn btn-pena" @onclick="Nuevo">Nuevo evento este día</button>
+                }
+                else
+                {
+                    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card">
+                        <DataAnnotationsValidator />
+                        <div class="card-header fw-semibold">Nuevo evento</div>
+                        <div class="card-body">
+                            @if (errorForm is not null)
+                            {
+                                <div class="alert alert-danger py-2">@errorForm</div>
+                            }
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Descripción</label>
+                                    <InputText class="form-control" @bind-Value="edicion.Descripcion" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Plazas máximas</label>
+                                    <InputNumber class="form-control" @bind-Value="edicion.PlazasMaximas" />
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <InputCheckbox class="form-check-input" @bind-Value="obligatorio" id="evtObligatorio" />
+                                        <label class="form-check-label" for="evtObligatorio">Obligatorio</label>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Características</label>
+                                    <InputTextArea class="form-control" rows="3" @bind-Value="edicion.Caracteristicas" />
+                                </div>
+                            </div>
+                            <ValidationSummary class="mt-3 small" />
+                        </div>
+                        <div class="card-footer d-flex gap-2">
+                            <button type="submit" class="btn btn-pena">Guardar</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelarForm">Cancelar</button>
+                        </div>
+                    </EditForm>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private static readonly string[] nombresDias = { "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" };
+
+    private long? socioId;
+    private bool esJunta;
+
+    private DateOnly hoy;
+    private DateOnly mesActual;
+    private List<DateOnly>? dias;
+    private Dictionary<DateOnly, List<Evento>> eventosPorFecha = new();
+    private Dictionary<long, int> ocupacion = new();
+    private Dictionary<long, EventoInscripcion> inscripcionPropia = new();
+    private string? error;
+
+    private DateOnly? diaSeleccionado;
+    private List<Evento>? eventosDelDia;
+    private long? eventoInscritosAbierto;
+    private Dictionary<long, List<InscritoFila>> inscritosPorEvento = new();
+    private long? idBorrando;
+
+    private Evento? edicion;
+    private bool obligatorio;
+    private string? errorForm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hoy = DateOnly.FromDateTime(DateTime.Today);
+        mesActual = hoy;
+
+        if (EstadoAutenticacion is not null)
+        {
+            var estado = await EstadoAutenticacion;
+            socioId = SocioAuth.SocioId(estado.User);
+            esJunta = SocioAuth.EsJunta(estado.User);
+        }
+
+        await CargarMes();
+    }
+
+    private bool TieneEvento(DateOnly fecha) => eventosPorFecha.ContainsKey(fecha);
+
+    private string ClaseDia(DateOnly celda)
+    {
+        var clases = new List<string> { "dia-habilitado" };
+        if (eventosPorFecha.TryGetValue(celda, out var eventosDia))
+        {
+            clases.Add(eventosDia.Any(e => e.Obligatorio == true) ? "dia-evento-obligatorio" : "dia-evento-opcional");
+        }
+        if (celda == hoy)
+        {
+            clases.Add("dia-hoy");
+        }
+        return string.Join(' ', clases);
+    }
+
+    private IEnumerable<DateOnly?[]> Semanas()
+    {
+        if (dias is null)
+        {
+            yield break;
+        }
+
+        var primerDia = new DateOnly(mesActual.Year, mesActual.Month, 1);
+        var offset = ((int)primerDia.DayOfWeek + 6) % 7; // lunes = 0
+        var celdas = new List<DateOnly?>();
+        for (var i = 0; i < offset; i++)
+        {
+            celdas.Add(null);
+        }
+        celdas.AddRange(dias.Select(d => (DateOnly?)d));
+        while (celdas.Count % 7 != 0)
+        {
+            celdas.Add(null);
+        }
+
+        for (var i = 0; i < celdas.Count; i += 7)
+        {
+            yield return celdas.Skip(i).Take(7).ToArray();
+        }
+    }
+
+    private async Task MesAnterior()
+    {
+        mesActual = mesActual.AddMonths(-1);
+        CerrarDia();
+        await CargarMes();
+    }
+
+    private async Task MesSiguiente()
+    {
+        mesActual = mesActual.AddMonths(1);
+        CerrarDia();
+        await CargarMes();
+    }
+
+    private async Task CargarMes()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var primerDia = new DateOnly(mesActual.Year, mesActual.Month, 1);
+            var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
+            dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
+
+            var eventosDelMes = await db.Eventos
+                .AsNoTracking()
+                .Where(e => e.Fecha >= primerDia && e.Fecha <= ultimoDia)
+                .OrderBy(e => e.Fecha)
+                .ToListAsync();
+
+            eventosPorFecha = eventosDelMes.GroupBy(e => e.Fecha).ToDictionary(g => g.Key, g => g.ToList());
+
+            var eventoIds = eventosDelMes.Select(e => e.Id).ToList();
+
+            ocupacion = (await db.EventoInscripciones
+                    .AsNoTracking()
+                    .Where(i => i.EventoId != null && eventoIds.Contains(i.EventoId.Value)
+                        && i.Acude == true && i.ListaEspera != true)
+                    .GroupBy(i => i.EventoId!.Value)
+                    .Select(g => new { EventoId = g.Key, Total = g.Count() })
+                    .ToListAsync())
+                .ToDictionary(x => x.EventoId, x => x.Total);
+
+            inscripcionPropia = socioId is null
+                ? new Dictionary<long, EventoInscripcion>()
+                : (await db.EventoInscripciones
+                    .AsNoTracking()
+                    .Where(i => i.SocioId == socioId && i.EventoId != null && eventoIds.Contains(i.EventoId.Value))
+                    .ToListAsync())
+                    .ToDictionary(i => i.EventoId!.Value);
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void AbrirDia(DateOnly fecha)
+    {
+        diaSeleccionado = fecha;
+        eventosDelDia = eventosPorFecha.TryGetValue(fecha, out var lista) ? lista : new List<Evento>();
+        edicion = null;
+        errorForm = null;
+        idBorrando = null;
+        eventoInscritosAbierto = null;
+        inscritosPorEvento.Clear();
+    }
+
+    private void CerrarDia()
+    {
+        diaSeleccionado = null;
+        eventosDelDia = null;
+        edicion = null;
+        idBorrando = null;
+        eventoInscritosAbierto = null;
+        inscritosPorEvento.Clear();
+    }
+
+    private async Task AlternarInscritos(long eventoId)
+    {
+        if (eventoInscritosAbierto == eventoId)
+        {
+            eventoInscritosAbierto = null;
+            return;
+        }
+
+        eventoInscritosAbierto = eventoId;
+
+        if (!inscritosPorEvento.ContainsKey(eventoId))
+        {
+            try
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+
+                var lista = await db.EventoInscripciones
+                    .AsNoTracking()
+                    .Where(i => i.EventoId == eventoId)
+                    .OrderBy(i => i.FechaInscripcion)
+                    .Select(i => new InscritoFila(
+                        i.SocioId,
+                        i.Socio != null ? $"{i.Socio.Nombre} {i.Socio.Apellidos}".Trim() : "(sin socio)",
+                        i.Socio != null ? i.Socio.UrlFoto : null,
+                        i.Socio != null ? i.Socio.Telefono : null,
+                        i.FechaInscripcion,
+                        i.ListaEspera))
+                    .ToListAsync();
+
+                inscritosPorEvento[eventoId] = lista;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+            }
+        }
+    }
+
+    private async Task Inscribirse(long eventoId)
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var yaInscrito = await db.EventoInscripciones
+                .AnyAsync(i => i.EventoId == eventoId && i.SocioId == socioId);
+            if (yaInscrito)
+            {
+                await CargarMes();
+                AbrirDia(diaSeleccionado!.Value);
+                return;
+            }
+
+            var evento = await db.Eventos.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventoId);
+            if (evento is null)
+            {
+                return;
+            }
+
+            var ocupadas = await db.EventoInscripciones
+                .CountAsync(i => i.EventoId == eventoId && i.Acude == true && i.ListaEspera != true);
+
+            var listaEspera = evento.PlazasMaximas is int max && ocupadas >= max;
+
+            db.EventoInscripciones.Add(new EventoInscripcion
+            {
+                EventoId = eventoId,
+                SocioId = socioId,
+                Acude = true,
+                ListaEspera = listaEspera,
+                FechaInscripcion = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+
+            inscritosPorEvento.Remove(eventoId);
+            await CargarMes();
+            AbrirDia(diaSeleccionado!.Value);
+            if (eventoInscritosAbierto == eventoId)
+            {
+                await AlternarInscritosForzado(eventoId);
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Baja(long eventoId)
+    {
+        if (socioId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var propia = await db.EventoInscripciones
+                .FirstOrDefaultAsync(i => i.EventoId == eventoId && i.SocioId == socioId);
+            if (propia is null)
+            {
+                return;
+            }
+
+            var liberaPlaza = propia.ListaEspera != true;
+
+            db.EventoInscripciones.Remove(propia);
+            await db.SaveChangesAsync();
+
+            if (liberaPlaza)
+            {
+                var siguiente = await db.EventoInscripciones
+                    .Where(i => i.EventoId == eventoId && i.ListaEspera == true)
+                    .OrderBy(i => i.FechaInscripcion)
+                    .FirstOrDefaultAsync();
+
+                if (siguiente is not null)
+                {
+                    siguiente.ListaEspera = false;
+                    await db.SaveChangesAsync();
+                }
+            }
+
+            inscritosPorEvento.Remove(eventoId);
+            await CargarMes();
+            AbrirDia(diaSeleccionado!.Value);
+            if (eventoInscritosAbierto == eventoId)
+            {
+                await AlternarInscritosForzado(eventoId);
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task AlternarInscritosForzado(long eventoId)
+    {
+        eventoInscritosAbierto = null;
+        await AlternarInscritos(eventoId);
+    }
+
+    private void Nuevo()
+    {
+        if (diaSeleccionado is null)
+        {
+            return;
+        }
+
+        edicion = new Evento { Fecha = diaSeleccionado.Value };
+        obligatorio = false;
+        errorForm = null;
+    }
+
+    private void CancelarForm()
+    {
+        edicion = null;
+        errorForm = null;
+    }
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(edicion.Descripcion))
+        {
+            errorForm = "La descripción es obligatoria.";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            edicion.Obligatorio = obligatorio;
+            db.Eventos.Add(edicion);
+            await db.SaveChangesAsync();
+
+            edicion = null;
+            errorForm = null;
+            await CargarMes();
+            AbrirDia(diaSeleccionado!.Value);
+        }
+        catch (Exception ex)
+        {
+            errorForm = ex.Message;
+        }
+    }
+
+    private async Task BorrarEvento(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            await db.EventoInscripciones.Where(i => i.EventoId == id).ExecuteDeleteAsync();
+            await db.Eventos.Where(e => e.Id == id).ExecuteDeleteAsync();
+
+            await CargarMes();
+            if (diaSeleccionado is not null)
+            {
+                AbrirDia(diaSeleccionado.Value);
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record InscritoFila(
+        long? SocioId, string SocioNombre, string? SocioFoto, string? SocioTelefono,
+        DateTime? FechaInscripcion, bool? ListaEspera);
+}
