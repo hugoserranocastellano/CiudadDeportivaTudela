@@ -67,7 +67,7 @@
                         @foreach (var adj in adjuntos)
                         {
                             <div class="d-flex align-items-center gap-2 border rounded p-2">
-                                <a href="@adj.Url" target="_blank" class="flex-grow-1">@adj.Nombre</a>
+                                <a href="@adj.Url" target="_blank" class="flex-grow-1 text-primary fw-semibold">@adj.Nombre</a>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="@("adjVis" + adj.Id)"
                                            checked="@adj.Visible" @onchange="@(e => AlternarVisibleAdjunto(adj, (bool)e.Value!))" />
@@ -79,21 +79,14 @@
                     </div>
                 }
 
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-5">
-                        <label class="form-label">Nombre del adjunto</label>
-                        <InputText class="form-control" @bind-Value="nombreNuevoAdjunto" />
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label">Fichero</label>
-                        <InputFile @ref="inputFile" class="form-control" OnChange="ElegirFichero" />
-                    </div>
-                    <div class="col-md-2">
-                        <button type="button" class="btn btn-outline-secondary w-100" disabled="@(subiendoAdjunto || ficheroSeleccionado is null)" @onclick="SubirAdjunto">
-                            @(subiendoAdjunto ? "Subiendo..." : "Añadir")
-                        </button>
-                    </div>
+                <div class="mb-2">
+                    <label class="form-label">Ficheros</label>
+                    <InputFile @ref="inputFile" class="form-control" multiple OnChange="ElegirFicheros" />
                 </div>
+                @if (subiendoAdjunto)
+                {
+                    <p class="text-muted small mb-0">Subiendo...</p>
+                }
             @if (errorAdjunto is not null)
             {
                 <div class="text-danger small mt-2">@errorAdjunto</div>
@@ -167,10 +160,9 @@ else
     private string? error;
 
     private InputFile? inputFile;
-    private IBrowserFile? ficheroSeleccionado;
-    private string nombreNuevoAdjunto = string.Empty;
     private bool subiendoAdjunto;
     private string? errorAdjunto;
+    private const int MaxAdjuntosPorSeleccion = 20;
 
     protected override Task OnInitializedAsync() => Cargar();
 
@@ -350,21 +342,10 @@ else
         }
     }
 
-    private void ElegirFichero(InputFileChangeEventArgs e)
+    private async Task ElegirFicheros(InputFileChangeEventArgs e)
     {
-        errorAdjunto = null;
-        ficheroSeleccionado = e.File;
-        if (string.IsNullOrWhiteSpace(nombreNuevoAdjunto))
+        if (edicion is null)
         {
-            nombreNuevoAdjunto = e.File.Name;
-        }
-    }
-
-    private async Task SubirAdjunto()
-    {
-        if (edicion is null || ficheroSeleccionado is null || string.IsNullOrWhiteSpace(nombreNuevoAdjunto))
-        {
-            errorAdjunto = "Indica un nombre y selecciona un fichero.";
             return;
         }
 
@@ -372,28 +353,31 @@ else
         errorAdjunto = null;
         try
         {
-            var extension = Path.GetExtension(ficheroSeleccionado.Name);
-            var ruta = $"{edicion.Id}/{Guid.NewGuid():N}{extension}";
-
-            await using var stream = ficheroSeleccionado.OpenReadStream(20 * 1024 * 1024);
-            var url = await Storage.SubirAsync("ActasJuntas", ruta, stream,
-                string.IsNullOrWhiteSpace(ficheroSeleccionado.ContentType) ? "application/octet-stream" : ficheroSeleccionado.ContentType);
-
             await using var db = await DbFactory.CreateDbContextAsync();
-            db.AdjuntosReunion.Add(new AdjuntoReunion
+
+            foreach (var fichero in e.GetMultipleFiles(MaxAdjuntosPorSeleccion))
             {
-                ReunionId = edicion.Id,
-                Nombre = nombreNuevoAdjunto.Trim(),
-                Url = url,
-                Visible = false,
-            });
+                var extension = Path.GetExtension(fichero.Name);
+                var ruta = $"{edicion.Id}/{Guid.NewGuid():N}{extension}";
+
+                await using var stream = fichero.OpenReadStream(20 * 1024 * 1024);
+                var url = await Storage.SubirAsync("ActasJuntas", ruta, stream,
+                    string.IsNullOrWhiteSpace(fichero.ContentType) ? "application/octet-stream" : fichero.ContentType);
+
+                db.AdjuntosReunion.Add(new AdjuntoReunion
+                {
+                    ReunionId = edicion.Id,
+                    Nombre = fichero.Name,
+                    Url = url,
+                    Visible = false,
+                });
+            }
+
             await db.SaveChangesAsync();
 
             await Cargar();
             var actualizada = reuniones!.FirstOrDefault(r => r.Id == edicion.Id);
             adjuntos = actualizada?.Adjuntos.OrderBy(a => a.Nombre).ToList() ?? new List<AdjuntoReunion>();
-
-            LimpiarAdjuntoForm();
         }
         catch (Exception ex)
         {
@@ -460,8 +444,6 @@ else
 
     private void LimpiarAdjuntoForm()
     {
-        ficheroSeleccionado = null;
-        nombreNuevoAdjunto = string.Empty;
         errorAdjunto = null;
     }
 }
