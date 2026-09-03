@@ -99,8 +99,10 @@ else
                 @foreach (var ev in eventosDelDia)
                 {
                     var ocupadas = ocupacion.TryGetValue(ev.Id, out var oc) ? oc : 0;
-                    var disponibles = ev.PlazasMaximas is int max ? Math.Max(0, max - ocupadas) : (int?)null;
+                    var disponibles = ev.VoluntariosNecesarios is int max ? Math.Max(0, max - ocupadas) : (int?)null;
                     var propia = inscripcionPropia.TryGetValue(ev.Id, out var insc) ? insc : null;
+                    var plazoPasado = ev.FechaTopeApuntarse is DateOnly tope && tope < hoy;
+                    var cerrado = ev.Estado is not null && ev.Estado != "abierto";
 
                     <div class="card mb-3 evento-card @(ev.Obligatorio == true ? "evento-obligatorio" : "evento-opcional")">
                         <div class="card-body">
@@ -126,20 +128,24 @@ else
                                     }
                                 }
                             </div>
-                            @if (!string.IsNullOrWhiteSpace(ev.Caracteristicas))
-                            {
-                                <p class="mb-2">@ev.Caracteristicas</p>
-                            }
                             <p class="text-muted small mb-2">
                                 @if (disponibles is not null)
                                 {
-                                    <text>Plazas libres: @disponibles / @ev.PlazasMaximas</text>
+                                    <text>Voluntarios: @disponibles / @ev.VoluntariosNecesarios</text>
                                 }
                                 else
                                 {
-                                    <text>Sin límite de plazas</text>
+                                    <text>Sin límite de voluntarios</text>
                                 }
                                 · @ocupadas inscrito(s)
+                                @if (ev.FechaTopeApuntarse is DateOnly tope2)
+                                {
+                                    <text> · Fecha límite para apuntarse: @tope2.ToString("dd/MM/yyyy")</text>
+                                }
+                                @if (cerrado)
+                                {
+                                    <text> · <span class="badge text-bg-secondary">Cerrado</span></text>
+                                }
                             </p>
 
                             <div class="d-flex flex-wrap gap-2 mb-2">
@@ -149,7 +155,7 @@ else
 
                                 @if (propia is null)
                                 {
-                                    <button class="btn btn-sm btn-pena" @onclick="() => Inscribirse(ev.Id)">Inscribirse</button>
+                                    <button class="btn btn-sm btn-pena" disabled="@(plazoPasado || cerrado)" @onclick="() => Inscribirse(ev.Id)">Inscribirse</button>
                                 }
                                 else
                                 {
@@ -226,8 +232,8 @@ else
                                     <InputText class="form-control" @bind-Value="edicion.Descripcion" />
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label">Plazas máximas</label>
-                                    <InputNumber class="form-control" @bind-Value="edicion.PlazasMaximas" />
+                                    <label class="form-label">Voluntarios necesarios</label>
+                                    <InputNumber class="form-control" @bind-Value="edicion.VoluntariosNecesarios" />
                                 </div>
                                 <div class="col-md-3 d-flex align-items-end">
                                     <div class="form-check">
@@ -235,9 +241,9 @@ else
                                         <label class="form-check-label" for="evtObligatorio">Obligatorio</label>
                                     </div>
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label">Características</label>
-                                    <InputTextArea class="form-control" rows="3" @bind-Value="edicion.Caracteristicas" />
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha límite para apuntarse</label>
+                                    <InputDate class="form-control" @bind-Value="edicion.FechaTopeApuntarse" />
                                 </div>
                             </div>
                             <ValidationSummary class="mt-3 small" />
@@ -361,13 +367,17 @@ else
             var ultimoDia = primerDia.AddMonths(1).AddDays(-1);
             dias = Enumerable.Range(0, ultimoDia.Day).Select(i => primerDia.AddDays(i)).ToList();
 
+            var desde = primerDia.ToDateTime(TimeOnly.MinValue);
+            var hasta = ultimoDia.AddDays(1).ToDateTime(TimeOnly.MinValue);
             var eventosDelMes = await db.Eventos
                 .AsNoTracking()
-                .Where(e => e.Fecha >= primerDia && e.Fecha <= ultimoDia)
+                .Where(e => e.Fecha >= desde && e.Fecha < hasta)
                 .OrderBy(e => e.Fecha)
                 .ToListAsync();
 
-            eventosPorFecha = eventosDelMes.GroupBy(e => e.Fecha).ToDictionary(g => g.Key, g => g.ToList());
+            eventosPorFecha = eventosDelMes
+                .GroupBy(e => DateOnly.FromDateTime(e.Fecha))
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             var eventoIds = eventosDelMes.Select(e => e.Id).ToList();
 
@@ -484,7 +494,7 @@ else
             var ocupadas = await db.EventoInscripciones
                 .CountAsync(i => i.EventoId == eventoId && i.Acude == true && i.ListaEspera != true);
 
-            var listaEspera = evento.PlazasMaximas is int max && ocupadas >= max;
+            var listaEspera = evento.VoluntariosNecesarios is int max && ocupadas >= max;
 
             db.EventoInscripciones.Add(new EventoInscripcion
             {
@@ -578,7 +588,7 @@ else
             return;
         }
 
-        edicion = new Evento { Fecha = diaSeleccionado.Value };
+        edicion = new Evento { Fecha = diaSeleccionado.Value.ToDateTime(TimeOnly.MinValue) };
         obligatorio = false;
         errorForm = null;
     }
@@ -607,6 +617,7 @@ else
             await using var db = await DbFactory.CreateDbContextAsync();
 
             edicion.Obligatorio = obligatorio;
+            edicion.Estado ??= "abierto";
             db.Eventos.Add(edicion);
             await db.SaveChangesAsync();
 

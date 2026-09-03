@@ -6,11 +6,13 @@ public class Evento
 
     public string Descripcion { get; set; } = string.Empty;
 
-    public DateOnly Fecha { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DateTime Fecha { get; set; } = DateTime.Today;
 
-    public string? Caracteristicas { get; set; }
+    public int? VoluntariosNecesarios { get; set; }
+
+    public DateOnly? FechaTopeApuntarse { get; set; }
 
     public bool? Obligatorio { get; set; } = false;
 
-    public int? PlazasMaximas { get; set; }
+    public string? Estado { get; set; } = "abierto";
 }

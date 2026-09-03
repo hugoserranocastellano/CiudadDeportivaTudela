@@ -63,7 +63,7 @@ else
     private string DescripcionEvento(long? id) =>
         id is not null && eventos.TryGetValue(id.Value, out var evento) ? evento.Descripcion : "—";
 
-    private DateOnly? FechaEvento(long? id) =>
+    private DateTime? FechaEvento(long? id) =>
         id is not null && eventos.TryGetValue(id.Value, out var evento) ? evento.Fecha : null;
 
     private string ordenCampo = "inscripcion";
