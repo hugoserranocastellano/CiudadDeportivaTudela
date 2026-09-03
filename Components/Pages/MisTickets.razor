@@ -53,7 +53,7 @@ else
                             <td>@ticket.Id</td>
                             <td>@ticket.Fecha?.ToString("dd/MM/yyyy")</td>
                             <td class="text-end">@ticket.ImporteTotal?.ToString("0.00")€</td>
-                            <td><span class="badge text-bg-warning">Abierto</span></td>
+                            <td><span class="badge text-bg-warning">Pendiente</span></td>
                             <td>@ticket.NumeroLineas</td>
                             <td><a class="btn btn-sm btn-pena" href="tickets/nuevo">Continuar</a></td>
                         </tr>
@@ -82,55 +82,56 @@ else
                             </td>
                         </tr>
                     }
-                    @if (ticketSeleccionado == ticket.Id)
-                    {
-                        <tr>
-                            <td colspan="6" class="table-primary bg-opacity-25" style="border-left: 4px solid var(--bs-primary);">
-                                @if (lineasCargando)
-                                {
-                                    <p class="mb-0"><em>Cargando detalle...</em></p>
-                                }
-                                else if (lineas is not null)
-                                {
-                                    @if (lineas.Count == 0)
-                                    {
-                                        <p class="mb-2"><em>Este ticket no tiene líneas.</em></p>
-                                    }
-                                    else
-                                    {
-                                        <div class="table-responsive">
-                                            <table class="table table-sm mb-2">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Artículo</th>
-                                                        <th class="text-end">Precio unidad</th>
-                                                        <th class="text-end">Unidades</th>
-                                                        <th class="text-end">Subtotal</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach (var linea in lineas)
-                                                    {
-                                                        <tr>
-                                                            <td>@linea.Articulo</td>
-                                                            <td class="text-end">@linea.PrecioUnidad?.ToString("0.00")€</td>
-                                                            <td class="text-end">@linea.Unidades</td>
-                                                            <td class="text-end">@linea.Subtotal?.ToString("0.00")€</td>
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    }
-                                    <button class="btn btn-sm btn-outline-secondary" @onclick="Deseleccionar">Volver</button>
-                                }
-                            </td>
-                        </tr>
-                    }
                 }
             </tbody>
         </table>
     </div>
+
+    @if (ticketSeleccionado is not null)
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                @if (lineasCargando)
+                {
+                    <p class="mb-0"><em>Cargando detalle...</em></p>
+                }
+                else if (lineas is not null)
+                {
+                    @if (lineas.Count == 0)
+                    {
+                        <p class="mb-2"><em>Este ticket no tiene líneas.</em></p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-2">
+                                <thead>
+                                    <tr>
+                                        <th>Artículo</th>
+                                        <th class="text-end">Precio unidad</th>
+                                        <th class="text-end">Unidades</th>
+                                        <th class="text-end">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var linea in lineas)
+                                    {
+                                        <tr>
+                                            <td>@linea.Articulo</td>
+                                            <td class="text-end">@linea.PrecioUnidad?.ToString("0.00")€</td>
+                                            <td class="text-end">@linea.Unidades</td>
+                                            <td class="text-end">@linea.Subtotal?.ToString("0.00")€</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Deseleccionar">Volver</button>
+                }
+            </div>
+        </div>
+    }
 }
 
 @code {

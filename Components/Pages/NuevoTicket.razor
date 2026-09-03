@@ -27,14 +27,21 @@ else
             <div class="text-muted">@socio.Nombre @socio.Apellidos · @fecha.ToString("dd/MM/yyyy HH:mm")</div>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="AbrirPago">Pagar</button>
             <button type="button" class="btn btn-outline-danger" @onclick="Cancelar">Cancelar</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@(lineas.Count == 0 || guardando)" @onclick="Guardar">
+                @(guardando ? "Guardando..." : "Guardar")
+            </button>
+            <button type="button" class="btn btn-pena" disabled="@(lineas.Count == 0)" @onclick="AbrirPago">Pagar</button>
         </div>
     </div>
 
     @if (error is not null)
     {
         <div class="alert alert-danger py-2"><code>@error</code></div>
+    }
+    @if (mensajeGuardado is not null)
+    {
+        <div class="alert alert-success py-2">@mensajeGuardado</div>
     }
 
     @if (mensajeCatalogo is not null)
@@ -67,7 +74,12 @@ else
                                 <p class="text-muted small">Sube una foto del recibo del TPV.</p>
                                 @if (ticketId is long id)
                                 {
-                                    <SubidaSimple Bucket="Tickets" Path="@id.ToString()" FotoSubida="PagarConTarjeta" Disabled="@pagando" />
+                                    <FotoCropper Bucket="Tickets" Path="@id.ToString()" Disabled="@pagando"
+                                                 FotoSubida="PagarConTarjeta" />
+                                }
+                                else
+                                {
+                                    <p class="text-muted small"><em>Pulsa "Guardar" primero para poder subir la foto.</em></p>
                                 }
                             </div>
                         </div>
@@ -76,12 +88,19 @@ else
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6>Pagar en metálico</h6>
-                                <p class="text-muted small">
-                                    Apunta este número en el sobre: <strong class="fs-5">#@ticketId</strong>
-                                </p>
-                                <button type="button" class="btn btn-pena" disabled="@pagando" @onclick="PagarEnEfectivo">
-                                    @(pagando ? "Confirmando..." : "Confirmar pago en efectivo")
-                                </button>
+                                @if (ticketId is not null)
+                                {
+                                    <p class="text-muted small">
+                                        Apunta este número en el sobre: <strong class="fs-5">#@ticketId</strong>
+                                    </p>
+                                    <button type="button" class="btn btn-pena" disabled="@pagando" @onclick="PagarEnEfectivo">
+                                        @(pagando ? "Confirmando..." : "Confirmar pago en efectivo")
+                                    </button>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small"><em>Pulsa "Guardar" primero.</em></p>
+                                }
                             </div>
                         </div>
                     </div>
@@ -224,7 +243,10 @@ else
     private string? error;
     private bool mostrarPago;
     private bool pagando;
+    private bool guardando;
     private string? errorPago;
+    private string? mensajeGuardado;
+    private bool huboCambiosSinGuardar;
 
     private IJSObjectReference? moduloAviso;
 
@@ -281,16 +303,6 @@ else
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        // Llamar a JS interop desde OnInitializedAsync puede fallar durante el
-        // prerenderizado; se espera a que el circuito esté vivo de verdad.
-        if (firstRender && lineas.Count > 0)
-        {
-            await ActualizarAvisoSalida();
-        }
-    }
-
     private async Task<IJSObjectReference> ModuloAvisoAsync()
     {
         moduloAviso ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/avisoSalida.js");
@@ -300,19 +312,26 @@ else
     private async Task ActualizarAvisoSalida()
     {
         var js = await ModuloAvisoAsync();
-        await js.InvokeVoidAsync(lineas.Count > 0 ? "activar" : "desactivar");
+        await js.InvokeVoidAsync(huboCambiosSinGuardar ? "activar" : "desactivar");
+    }
+
+    private void MarcarSinGuardar()
+    {
+        huboCambiosSinGuardar = true;
+        mensajeGuardado = null;
+        _ = ActualizarAvisoSalida();
     }
 
     private async Task ConfirmarSalida(LocationChangingContext context)
     {
-        if (lineas.Count == 0)
+        if (!huboCambiosSinGuardar)
         {
             return;
         }
 
         var continuar = await JS.InvokeAsync<bool>(
             "confirm",
-            "Tienes un ticket sin pagar. Queda guardado y puedes continuarlo luego desde \"Mis tickets\", pero ¿seguro que quieres salir ahora?");
+            "Tienes cambios sin guardar en el ticket. Si sales se perderán. ¿Seguro que quieres salir ahora?");
         if (!continuar)
         {
             context.PreventNavigation();
@@ -337,7 +356,7 @@ else
             return;
         }
 
-        _ = AnadirYGuardar(articulo);
+        Anadir(articulo);
         filtro = string.Empty;
         error = null;
     }
@@ -348,7 +367,7 @@ else
 
     private async Task AnadirDesdeCatalogo(Articulo articulo)
     {
-        await AnadirYGuardar(articulo);
+        Anadir(articulo);
         mensajeCatalogo = $"«{articulo.Descripcion}» añadido.";
 
         var token = ++tokenMensajeCatalogo;
@@ -362,14 +381,9 @@ else
         }
     }
 
-    private async Task AnadirYGuardar(Articulo articulo)
-    {
-        Anadir(articulo);
-        await PersistirAsync();
-    }
-
     private void Anadir(Articulo articulo)
     {
+        MarcarSinGuardar();
         var existente = lineas.FirstOrDefault(l => l.ArticuloId == articulo.Id);
         if (existente is not null)
         {
@@ -389,7 +403,7 @@ else
         }
     }
 
-    private async Task CambiarCantidad(TicketLinea linea, int delta)
+    private void CambiarCantidad(TicketLinea linea, int delta)
     {
         var nuevasUnidades = (linea.Unidades ?? 1) + delta;
         if (nuevasUnidades < 1)
@@ -399,20 +413,41 @@ else
 
         linea.Unidades = nuevasUnidades;
         linea.Subtotal = (linea.PrecioUnidad ?? 0) * nuevasUnidades;
-        await PersistirAsync();
+        MarcarSinGuardar();
     }
 
-    private async Task EliminarLinea(TicketLinea linea)
+    private void EliminarLinea(TicketLinea linea)
     {
         lineas.Remove(linea);
-        await PersistirAsync();
+        MarcarSinGuardar();
+    }
+
+    private async Task Guardar()
+    {
+        if (lineas.Count == 0)
+        {
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await PersistirAsync();
+            huboCambiosSinGuardar = false;
+            mensajeGuardado = "Ticket guardado. Puedes continuarlo luego desde \"Mis tickets\" si no terminas ahora.";
+            await ActualizarAvisoSalida();
+        }
+        finally
+        {
+            guardando = false;
+        }
     }
 
     /// <summary>
-    /// Crea el ticket en cuanto tiene la primera línea, y en cada cambio
-    /// posterior reemplaza sus líneas por las actuales (borrar+reinsertar es
-    /// más simple y fiable que rastrear altas/bajas individuales una a una).
-    /// Así el ticket queda recuperable si el socio sale sin pagar.
+    /// Crea el ticket si todavía no existía, y reemplaza sus líneas por las
+    /// actuales (borrar+reinsertar es más simple y fiable que rastrear
+    /// altas/bajas individuales una a una). Solo se llama al pulsar "Guardar"
+    /// (o al pagar, que guarda antes de cerrar el ticket).
     /// </summary>
     private async Task PersistirAsync()
     {
@@ -462,7 +497,6 @@ else
                 .ExecuteUpdateAsync(t => t.SetProperty(x => x.ImporteTotal, Total));
 
             error = null;
-            await ActualizarAvisoSalida();
         }
         catch (Exception ex)
         {
@@ -470,8 +504,15 @@ else
         }
     }
 
-    private void AbrirPago()
+    private async Task AbrirPago()
     {
+        // Si aún no se había pulsado "Guardar", se guarda ahora para que el
+        // panel de pago siempre tenga un ticket real donde apoyarse.
+        if (huboCambiosSinGuardar || ticketId is null)
+        {
+            await Guardar();
+        }
+
         mostrarPago = true;
         errorPago = null;
     }
