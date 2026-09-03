@@ -1,0 +1,433 @@
+@page "/reuniones"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SupabaseStorageService Storage
+
+<PageTitle>Reuniones</PageTitle>
+<JuntaGuard />
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Reuniones</h1>
+    <button class="btn btn-pena" @onclick="Nuevo">Nueva reunión</button>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (edicion is not null)
+{
+    <EditForm Model="edicion" OnValidSubmit="Guardar" class="card mb-4">
+        <DataAnnotationsValidator />
+        <div class="card-header fw-semibold">@(esNuevo ? "Nueva reunión" : $"Editar «{edicion.Titulo}»")</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label">Título</label>
+                    <InputText class="form-control" @bind-Value="edicion.Titulo" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fecha prevista</label>
+                    <InputDate class="form-control" @bind-Value="edicion.FechaPrevista" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Tipo de reunión</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.TipoReunionId" @bind-Value:after="AlAmbiarTipo">
+                        @foreach (var tipo in tipos)
+                        {
+                            <option value="@tipo.Id">@tipo.Descripcion</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="edicion.Visible" id="reuVisible" />
+                        <label class="form-check-label" for="reuVisible">Visible para todos los socios</label>
+                    </div>
+                </div>
+            </div>
+            <ValidationSummary class="mt-3 small" />
+
+            @if (!esNuevo)
+            {
+                <hr />
+                <h6 class="fw-semibold">Adjuntos</h6>
+
+                @if (adjuntos.Count == 0)
+                {
+                    <p class="text-muted small">No hay adjuntos todavía.</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        @foreach (var adj in adjuntos)
+                        {
+                            <div class="d-flex align-items-center gap-2 border rounded p-2">
+                                <a href="@adj.Url" target="_blank" class="flex-grow-1">@adj.Nombre</a>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="@("adjVis" + adj.Id)"
+                                           checked="@adj.Visible" @onchange="@(e => AlternarVisibleAdjunto(adj, (bool)e.Value!))" />
+                                    <label class="form-check-label small" for="@("adjVis" + adj.Id)">Visible</label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => BorrarAdjunto(adj.Id)">Borrar</button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">Nombre del adjunto</label>
+                        <InputText class="form-control" @bind-Value="nombreNuevoAdjunto" />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Fichero</label>
+                        <InputFile @ref="inputFile" class="form-control" OnChange="ElegirFichero" />
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary w-100" disabled="@(subiendoAdjunto || ficheroSeleccionado is null)" @onclick="SubirAdjunto">
+                            @(subiendoAdjunto ? "Subiendo..." : "Añadir")
+                        </button>
+                    </div>
+                </div>
+                @if (errorAdjunto is not null)
+                {
+                    <div class="text-danger small mt-2">@errorAdjunto</div>
+                }
+            }
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-pena">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+            @if (!esNuevo)
+            {
+                @if (idBorrando == edicion.Id)
+                {
+                    <button type="button" class="btn btn-danger ms-auto" @onclick="() => Borrar(edicion.Id)">Confirmar borrado</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => idBorrando = edicion.Id">Borrar reunión</button>
+                }
+            }
+        </div>
+    </EditForm>
+}
+
+@if (reuniones is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (reuniones.Count == 0)
+{
+    <p><em>No hay reuniones todavía.</em></p>
+}
+else
+{
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Visible</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in reuniones)
+                {
+                    <tr>
+                        <td>@r.FechaPrevista.ToString("dd/MM/yyyy")</td>
+                        <td>@r.Titulo</td>
+                        <td>@(r.TipoReunion?.Descripcion ?? "(sin tipo)")</td>
+                        <td>@(r.Visible ? "Sí" : "No")</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-accion-icono" title="Editar" @onclick="() => Editar(r)">Ed.</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Reunion>? reuniones;
+    private List<TipoReunion> tipos = new();
+    private Reunion? edicion;
+    private List<AdjuntoReunion> adjuntos = new();
+    private bool esNuevo;
+    private long? idBorrando;
+    private string? error;
+
+    private InputFile? inputFile;
+    private IBrowserFile? ficheroSeleccionado;
+    private string nombreNuevoAdjunto = string.Empty;
+    private bool subiendoAdjunto;
+    private string? errorAdjunto;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            tipos = await db.TiposReunion.AsNoTracking().OrderBy(t => t.Descripcion).ToListAsync();
+
+            reuniones = await db.Reuniones
+                .AsNoTracking()
+                .Include(r => r.TipoReunion)
+                .OrderByDescending(r => r.FechaPrevista)
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            reuniones ??= new List<Reunion>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new Reunion
+        {
+            FechaPrevista = DateOnly.FromDateTime(DateTime.Today),
+            TipoReunionId = tipos.FirstOrDefault()?.Id,
+            Visible = tipos.FirstOrDefault()?.Junta != true,
+        };
+        adjuntos = new List<AdjuntoReunion>();
+        esNuevo = true;
+        idBorrando = null;
+        LimpiarAdjuntoForm();
+    }
+
+    private void AlAmbiarTipo()
+    {
+        if (edicion is null || !esNuevo)
+        {
+            return;
+        }
+
+        var tipo = tipos.FirstOrDefault(t => t.Id == edicion.TipoReunionId);
+        edicion.Visible = tipo?.Junta != true;
+    }
+
+    private void Editar(Reunion reunion)
+    {
+        edicion = new Reunion
+        {
+            Id = reunion.Id,
+            FechaPrevista = reunion.FechaPrevista,
+            Titulo = reunion.Titulo,
+            TipoReunionId = reunion.TipoReunionId,
+            Visible = reunion.Visible,
+        };
+        adjuntos = reunion.Adjuntos.OrderBy(a => a.Nombre).ToList();
+        esNuevo = false;
+        idBorrando = null;
+        LimpiarAdjuntoForm();
+    }
+
+    private void Cancelar()
+    {
+        edicion = null;
+        LimpiarAdjuntoForm();
+    }
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.Reuniones.Add(edicion);
+                await db.SaveChangesAsync();
+                esNuevo = false;
+            }
+            else
+            {
+                await db.Reuniones.Where(r => r.Id == edicion.Id)
+                    .ExecuteUpdateAsync(r => r
+                        .SetProperty(x => x.FechaPrevista, edicion.FechaPrevista)
+                        .SetProperty(x => x.Titulo, edicion.Titulo)
+                        .SetProperty(x => x.TipoReunionId, edicion.TipoReunionId)
+                        .SetProperty(x => x.Visible, edicion.Visible));
+            }
+
+            await Cargar();
+            var actualizada = reuniones!.FirstOrDefault(r => r.Id == edicion.Id);
+            if (actualizada is not null)
+            {
+                Editar(actualizada);
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var rutasABorrar = await db.AdjuntosReunion
+                .Where(a => a.ReunionId == id)
+                .Select(a => a.Url)
+                .ToListAsync();
+
+            await db.AdjuntosReunion.Where(a => a.ReunionId == id).ExecuteDeleteAsync();
+            await db.Reuniones.Where(r => r.Id == id).ExecuteDeleteAsync();
+
+            foreach (var url in rutasABorrar)
+            {
+                await BorrarDeStorageSiPropio(url);
+            }
+
+            edicion = null;
+            LimpiarAdjuntoForm();
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private void ElegirFichero(InputFileChangeEventArgs e)
+    {
+        errorAdjunto = null;
+        ficheroSeleccionado = e.File;
+        if (string.IsNullOrWhiteSpace(nombreNuevoAdjunto))
+        {
+            nombreNuevoAdjunto = e.File.Name;
+        }
+    }
+
+    private async Task SubirAdjunto()
+    {
+        if (edicion is null || ficheroSeleccionado is null || string.IsNullOrWhiteSpace(nombreNuevoAdjunto))
+        {
+            errorAdjunto = "Indica un nombre y selecciona un fichero.";
+            return;
+        }
+
+        subiendoAdjunto = true;
+        errorAdjunto = null;
+        try
+        {
+            var extension = Path.GetExtension(ficheroSeleccionado.Name);
+            var ruta = $"{edicion.Id}/{Guid.NewGuid():N}{extension}";
+
+            await using var stream = ficheroSeleccionado.OpenReadStream(20 * 1024 * 1024);
+            var url = await Storage.SubirAsync("ActasJuntas", ruta, stream,
+                string.IsNullOrWhiteSpace(ficheroSeleccionado.ContentType) ? "application/octet-stream" : ficheroSeleccionado.ContentType);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.AdjuntosReunion.Add(new AdjuntoReunion
+            {
+                ReunionId = edicion.Id,
+                Nombre = nombreNuevoAdjunto.Trim(),
+                Url = url,
+                Visible = false,
+            });
+            await db.SaveChangesAsync();
+
+            await Cargar();
+            var actualizada = reuniones!.FirstOrDefault(r => r.Id == edicion.Id);
+            adjuntos = actualizada?.Adjuntos.OrderBy(a => a.Nombre).ToList() ?? new List<AdjuntoReunion>();
+
+            LimpiarAdjuntoForm();
+        }
+        catch (Exception ex)
+        {
+            errorAdjunto = ex.Message;
+        }
+        finally
+        {
+            subiendoAdjunto = false;
+        }
+    }
+
+    private async Task AlternarVisibleAdjunto(AdjuntoReunion adjunto, bool visible)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.AdjuntosReunion.Where(a => a.Id == adjunto.Id)
+                .ExecuteUpdateAsync(a => a.SetProperty(x => x.Visible, visible));
+
+            adjunto.Visible = visible;
+        }
+        catch (Exception ex)
+        {
+            errorAdjunto = ex.Message;
+        }
+    }
+
+    private async Task BorrarAdjunto(long id)
+    {
+        try
+        {
+            var adjunto = adjuntos.FirstOrDefault(a => a.Id == id);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.AdjuntosReunion.Where(a => a.Id == id).ExecuteDeleteAsync();
+
+            if (adjunto is not null)
+            {
+                await BorrarDeStorageSiPropio(adjunto.Url);
+            }
+
+            adjuntos.RemoveAll(a => a.Id == id);
+        }
+        catch (Exception ex)
+        {
+            errorAdjunto = ex.Message;
+        }
+    }
+
+    private async Task BorrarDeStorageSiPropio(string url)
+    {
+        // La URL pública tiene forma .../storage/v1/object/public/ActasJuntas/<ruta>; si no encaja
+        // (adjunto legado o manipulado a mano) simplemente no se intenta borrar en Storage.
+        var marcador = "/object/public/ActasJuntas/";
+        var indice = url.IndexOf(marcador, StringComparison.Ordinal);
+        if (indice < 0)
+        {
+            return;
+        }
+
+        var ruta = url[(indice + marcador.Length)..];
+        await Storage.BorrarAsync("ActasJuntas", ruta);
+    }
+
+    private void LimpiarAdjuntoForm()
+    {
+        ficheroSeleccionado = null;
+        nombreNuevoAdjunto = string.Empty;
+        errorAdjunto = null;
+    }
+}

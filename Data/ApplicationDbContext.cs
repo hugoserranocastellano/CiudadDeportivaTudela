@@ -40,6 +40,12 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<Evento> Eventos => Set<Evento>();
 
+    public DbSet<TipoReunion> TiposReunion => Set<TipoReunion>();
+
+    public DbSet<Reunion> Reuniones => Set<Reunion>();
+
+    public DbSet<AdjuntoReunion> AdjuntosReunion => Set<AdjuntoReunion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Socio>(entity =>
@@ -301,6 +307,49 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.FechaTopeApuntarse).HasColumnName("fecha_tope_apuntarse");
             entity.Property(e => e.Obligatorio).HasColumnName("obligatorio");
             entity.Property(e => e.Estado).HasColumnName("estado").HasDefaultValue("abierto");
+        });
+
+        modelBuilder.Entity<TipoReunion>(entity =>
+        {
+            entity.ToTable("tipos_reuniones");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_tipo_reunion");
+            entity.Property(e => e.Descripcion).HasColumnName("TipoReunion").IsRequired();
+            entity.Property(e => e.Junta).HasColumnName("Junta");
+        });
+
+        modelBuilder.Entity<Reunion>(entity =>
+        {
+            entity.ToTable("listado_reuniones");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_reunion");
+            entity.Property(e => e.FechaPrevista).HasColumnName("FechaPrevista");
+            entity.Property(e => e.Titulo).HasColumnName("TituloReunion").IsRequired();
+            entity.Property(e => e.TipoReunionId).HasColumnName("TipoReunion");
+            entity.Property(e => e.Visible).HasColumnName("Visible");
+
+            entity.HasOne(e => e.TipoReunion)
+                .WithMany()
+                .HasForeignKey(e => e.TipoReunionId);
+        });
+
+        modelBuilder.Entity<AdjuntoReunion>(entity =>
+        {
+            entity.ToTable("adjuntos_reuniones");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_adjunto_reunion");
+            entity.Property(e => e.ReunionId).HasColumnName("id_Reunion");
+            entity.Property(e => e.Nombre).HasColumnName("NombreAdjunto").IsRequired();
+            entity.Property(e => e.Url).HasColumnName("URL_Adjunto").IsRequired();
+            entity.Property(e => e.Visible).HasColumnName("AdjuntoVisible");
+
+            entity.HasOne(e => e.Reunion)
+                .WithMany(r => r.Adjuntos)
+                .HasForeignKey(e => e.ReunionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
     }

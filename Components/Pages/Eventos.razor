@@ -20,6 +20,7 @@
 <p class="text-muted small">
     <span class="leyenda-punto leyenda-obligatorio"></span> Obligatorio
     <span class="leyenda-punto leyenda-opcional ms-3"></span> Opcional
+    <span class="leyenda-punto leyenda-reunion ms-3"></span> Reunión
 </p>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -67,6 +68,10 @@ else
                                         {
                                             <span class="dia-punto"></span>
                                         }
+                                        @if (TieneReunion(celda))
+                                        {
+                                            <span class="dia-punto dia-punto-reunion"></span>
+                                        }
                                     </div>
                                 </td>
                             }
@@ -101,8 +106,10 @@ else
                     var ocupadas = ocupacion.TryGetValue(ev.Id, out var oc) ? oc : 0;
                     var disponibles = ev.VoluntariosNecesarios is int max ? Math.Max(0, max - ocupadas) : (int?)null;
                     var propia = inscripcionPropia.TryGetValue(ev.Id, out var insc) ? insc : null;
+                    var vencido = DateOnly.FromDateTime(ev.Fecha) < hoy;
                     var plazoPasado = ev.FechaTopeApuntarse is DateOnly tope && tope < hoy;
-                    var cerrado = ev.Estado is not null && ev.Estado != "abierto";
+                    var cerradoManual = string.Equals(ev.Estado, "cerrado", StringComparison.OrdinalIgnoreCase);
+                    var cerrado = !vencido && (cerradoManual || plazoPasado);
 
                     <div class="card mb-3 evento-card @(ev.Obligatorio == true ? "evento-obligatorio" : "evento-opcional")">
                         <div class="card-body">
@@ -115,17 +122,23 @@ else
                                 </h5>
                                 @if (esJunta)
                                 {
-                                    @if (idBorrando == ev.Id)
-                                    {
-                                        <span>
+                                    <span class="d-flex gap-2">
+                                        @if (!vencido)
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => AlternarCierre(ev.Id, cerradoManual)">
+                                                @(cerradoManual ? "Reabrir inscripciones" : "Cerrar inscripciones")
+                                            </button>
+                                        }
+                                        @if (idBorrando == ev.Id)
+                                        {
                                             <button class="btn btn-sm btn-danger" @onclick="() => BorrarEvento(ev.Id)">Confirmar</button>
                                             <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = ev.Id">Borrar</button>
-                                    }
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrando = ev.Id">Borrar</button>
+                                        }
+                                    </span>
                                 }
                             </div>
                             <p class="text-muted small mb-2">
@@ -142,7 +155,11 @@ else
                                 {
                                     <text> · Fecha límite para apuntarse: @tope2.ToString("dd/MM/yyyy")</text>
                                 }
-                                @if (cerrado)
+                                @if (vencido)
+                                {
+                                    <text> · <span class="badge text-bg-dark">Vencido</span></text>
+                                }
+                                else if (cerrado)
                                 {
                                     <text> · <span class="badge text-bg-secondary">Cerrado</span></text>
                                 }
@@ -155,7 +172,7 @@ else
 
                                 @if (propia is null)
                                 {
-                                    <button class="btn btn-sm btn-pena" disabled="@(plazoPasado || cerrado)" @onclick="() => Inscribirse(ev.Id)">Inscribirse</button>
+                                    <button class="btn btn-sm btn-pena" disabled="@(vencido || cerrado)" @onclick="() => Inscribirse(ev.Id)">Inscribirse</button>
                                 }
                                 else
                                 {
@@ -204,6 +221,47 @@ else
                                         }
                                     </div>
                                 }
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (reunionesDelDia is not null && reunionesDelDia.Count > 0)
+            {
+                @foreach (var reu in reunionesDelDia)
+                {
+                    var adjuntosVisibles = esJunta ? reu.Adjuntos : reu.Adjuntos.Where(a => a.Visible).ToList();
+
+                    <div class="card mb-3 evento-card evento-reunion">
+                        <div class="card-body">
+                            <h5 class="mb-1">
+                                @reu.Titulo
+                                <span class="badge text-bg-warning text-dark">Reunión</span>
+                                @if (esJunta && !reu.Visible)
+                                {
+                                    <span class="badge text-bg-secondary">Sólo junta</span>
+                                }
+                            </h5>
+                            <p class="text-muted small mb-2">@(reu.TipoReunion?.Descripcion ?? "(sin tipo)")</p>
+
+                            @if (adjuntosVisibles.Count == 0)
+                            {
+                                <p class="text-muted small mb-0">Sin adjuntos@(esJunta ? "" : " disponibles") todavía.</p>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column gap-1">
+                                    @foreach (var adj in adjuntosVisibles)
+                                    {
+                                        <a href="@adj.Url" target="_blank">@adj.Nombre</a>
+                                    }
+                                </div>
+                            }
+
+                            @if (esJunta)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary mt-2" href="reuniones">Gestionar en Reuniones</a>
                             }
                         </div>
                     </div>
@@ -272,12 +330,14 @@ else
     private DateOnly mesActual;
     private List<DateOnly>? dias;
     private Dictionary<DateOnly, List<Evento>> eventosPorFecha = new();
+    private Dictionary<DateOnly, List<Reunion>> reunionesPorFecha = new();
     private Dictionary<long, int> ocupacion = new();
     private Dictionary<long, EventoInscripcion> inscripcionPropia = new();
     private string? error;
 
     private DateOnly? diaSeleccionado;
     private List<Evento>? eventosDelDia;
+    private List<Reunion>? reunionesDelDia;
     private long? eventoInscritosAbierto;
     private Dictionary<long, List<InscritoFila>> inscritosPorEvento = new();
     private long? idBorrando;
@@ -303,12 +363,18 @@ else
 
     private bool TieneEvento(DateOnly fecha) => eventosPorFecha.ContainsKey(fecha);
 
+    private bool TieneReunion(DateOnly fecha) => reunionesPorFecha.ContainsKey(fecha);
+
     private string ClaseDia(DateOnly celda)
     {
         var clases = new List<string> { "dia-habilitado" };
         if (eventosPorFecha.TryGetValue(celda, out var eventosDia))
         {
             clases.Add(eventosDia.Any(e => e.Obligatorio == true) ? "dia-evento-obligatorio" : "dia-evento-opcional");
+        }
+        if (reunionesPorFecha.ContainsKey(celda))
+        {
+            clases.Add("dia-reunion");
         }
         if (celda == hoy)
         {
@@ -398,6 +464,22 @@ else
                     .ToListAsync())
                     .ToDictionary(i => i.EventoId!.Value);
 
+            var reunionesQuery = db.Reuniones
+                .AsNoTracking()
+                .Include(r => r.TipoReunion)
+                .Include(r => r.Adjuntos)
+                .Where(r => r.FechaPrevista >= primerDia && r.FechaPrevista <= ultimoDia);
+            if (!esJunta)
+            {
+                reunionesQuery = reunionesQuery.Where(r => r.Visible);
+            }
+
+            var reunionesDelMes = await reunionesQuery.OrderBy(r => r.FechaPrevista).ToListAsync();
+
+            reunionesPorFecha = reunionesDelMes
+                .GroupBy(r => r.FechaPrevista)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
             error = null;
         }
         catch (Exception ex)
@@ -410,6 +492,7 @@ else
     {
         diaSeleccionado = fecha;
         eventosDelDia = eventosPorFecha.TryGetValue(fecha, out var lista) ? lista : new List<Evento>();
+        reunionesDelDia = reunionesPorFecha.TryGetValue(fecha, out var reuniones) ? reuniones : new List<Reunion>();
         edicion = null;
         errorForm = null;
         idBorrando = null;
@@ -421,6 +504,7 @@ else
     {
         diaSeleccionado = null;
         eventosDelDia = null;
+        reunionesDelDia = null;
         edicion = null;
         idBorrando = null;
         eventoInscritosAbierto = null;
@@ -629,6 +713,30 @@ else
         catch (Exception ex)
         {
             errorForm = ex.Message;
+        }
+    }
+
+    private async Task AlternarCierre(long id, bool cerradoActualmente)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var nuevoEstado = cerradoActualmente ? "abierto" : "cerrado";
+            await db.Eventos.Where(e => e.Id == id)
+                .ExecuteUpdateAsync(e => e.SetProperty(x => x.Estado, nuevoEstado));
+
+            await CargarMes();
+            if (diaSeleccionado is not null)
+            {
+                AbrirDia(diaSeleccionado.Value);
+            }
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
         }
     }
 
