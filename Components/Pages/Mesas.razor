@@ -236,10 +236,12 @@ else
             Estancia = mesa.Estancia,
             Capacidad = mesa.Capacidad,
             Activa = mesa.Activa,
+            UrlFotoMesa = mesa.UrlFotoMesa,
         };
         activa = mesa.Activa != false;
         esNuevo = false;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private void Cancelar() => edicion = null;

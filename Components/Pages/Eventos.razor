@@ -83,6 +83,106 @@ else
     </div>
 }
 
+@if (esJunta)
+{
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">Todos los eventos</div>
+        <div class="card-body">
+            @if (errorLista is not null)
+            {
+                <div class="alert alert-danger py-2">@errorLista</div>
+            }
+
+            @if (edicionLista is not null)
+            {
+                <EditForm Model="edicionLista" OnValidSubmit="GuardarLista" class="card mb-3">
+                    <DataAnnotationsValidator />
+                    <div class="card-header fw-semibold">Editar evento</div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Descripción</label>
+                                <InputText class="form-control" @bind-Value="edicionLista.Descripcion" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Fecha</label>
+                                <InputDate class="form-control" @bind-Value="fechaLista" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Voluntarios necesarios</label>
+                                <InputNumber class="form-control" @bind-Value="edicionLista.VoluntariosNecesarios" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Fecha límite para apuntarse</label>
+                                <InputDate class="form-control" @bind-Value="edicionLista.FechaTopeApuntarse" />
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="obligatorioLista" id="evtObligatorioLista" />
+                                    <label class="form-check-label" for="evtObligatorioLista">Obligatorio</label>
+                                </div>
+                            </div>
+                        </div>
+                        <ValidationSummary class="mt-3 small" />
+                    </div>
+                    <div class="card-footer d-flex gap-2">
+                        <button type="submit" class="btn btn-pena">Guardar</button>
+                        <button type="button" class="btn btn-outline-secondary" @onclick="() => edicionLista = null">Cancelar</button>
+                    </div>
+                </EditForm>
+            }
+
+            @if (todosEventos is null)
+            {
+                <p><em>Cargando...</em></p>
+            }
+            else if (todosEventos.Count == 0)
+            {
+                <p class="text-muted">No hay eventos todavía.</p>
+            }
+            else
+            {
+                <div class="table-responsive tabla-marco">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Tipo</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ev in todosEventos)
+                            {
+                                <tr>
+                                    <td>@ev.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td>@ev.Descripcion</td>
+                                    <td>@(ev.Obligatorio == true ? "Obligatorio" : "Opcional")</td>
+                                    <td>@(string.Equals(ev.Estado, "cerrado", StringComparison.OrdinalIgnoreCase) ? "Cerrado" : "Abierto")</td>
+                                    <td class="text-end text-nowrap">
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditarEventoLista(ev)">Editar</button>
+                                        @if (idBorrandoLista == ev.Id)
+                                        {
+                                            <button class="btn btn-sm btn-danger" @onclick="() => BorrarEventoLista(ev.Id)">Confirmar</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => idBorrandoLista = null">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => idBorrandoLista = ev.Id">Borrar</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 @if (diaSeleccionado is not null)
 {
     <div class="card mb-4">
@@ -346,6 +446,13 @@ else
     private bool obligatorio;
     private string? errorForm;
 
+    private List<Evento>? todosEventos;
+    private Evento? edicionLista;
+    private bool obligatorioLista;
+    private DateOnly fechaLista;
+    private long? idBorrandoLista;
+    private string? errorLista;
+
     protected override async Task OnInitializedAsync()
     {
         hoy = DateOnly.FromDateTime(DateTime.Today);
@@ -359,6 +466,98 @@ else
         }
 
         await CargarMes();
+
+        if (esJunta)
+        {
+            await CargarTodosEventos();
+        }
+    }
+
+    private async Task CargarTodosEventos()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            todosEventos = await db.Eventos
+                .AsNoTracking()
+                .OrderByDescending(e => e.Fecha)
+                .ToListAsync();
+
+            errorLista = null;
+        }
+        catch (Exception ex)
+        {
+            todosEventos ??= new List<Evento>();
+            errorLista = ex.Message;
+        }
+    }
+
+    private void EditarEventoLista(Evento evento)
+    {
+        edicionLista = new Evento
+        {
+            Id = evento.Id,
+            Descripcion = evento.Descripcion,
+            Fecha = evento.Fecha,
+            VoluntariosNecesarios = evento.VoluntariosNecesarios,
+            Obligatorio = evento.Obligatorio,
+            FechaTopeApuntarse = evento.FechaTopeApuntarse,
+            Estado = evento.Estado,
+        };
+        obligatorioLista = evento.Obligatorio == true;
+        fechaLista = DateOnly.FromDateTime(evento.Fecha);
+        idBorrandoLista = null;
+        errorLista = null;
+    }
+
+    private async Task GuardarLista()
+    {
+        if (edicionLista is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(edicionLista.Descripcion))
+        {
+            errorLista = "La descripción es obligatoria.";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            var nuevaFecha = DateTime.SpecifyKind(fechaLista.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
+            await db.Eventos.Where(e => e.Id == edicionLista.Id)
+                .ExecuteUpdateAsync(e => e
+                    .SetProperty(x => x.Descripcion, edicionLista.Descripcion)
+                    .SetProperty(x => x.Fecha, nuevaFecha)
+                    .SetProperty(x => x.VoluntariosNecesarios, edicionLista.VoluntariosNecesarios)
+                    .SetProperty(x => x.Obligatorio, obligatorioLista)
+                    .SetProperty(x => x.FechaTopeApuntarse, edicionLista.FechaTopeApuntarse));
+
+            edicionLista = null;
+            errorLista = null;
+            await CargarTodosEventos();
+            await CargarMes();
+            if (diaSeleccionado is not null)
+            {
+                AbrirDia(diaSeleccionado.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorLista = ex.InnerException?.Message ?? ex.Message;
+        }
+    }
+
+    private async Task BorrarEventoLista(long id)
+    {
+        idBorrandoLista = null;
+        await BorrarEvento(id);
+        await CargarTodosEventos();
     }
 
     private bool TieneEvento(DateOnly fecha) => eventosPorFecha.ContainsKey(fecha);
@@ -713,6 +912,7 @@ else
             errorForm = null;
             await CargarMes();
             AbrirDia(diaSeleccionado!.Value);
+            await CargarTodosEventos();
         }
         catch (Exception ex)
         {
@@ -735,6 +935,7 @@ else
             {
                 AbrirDia(diaSeleccionado.Value);
             }
+            await CargarTodosEventos();
 
             error = null;
         }
