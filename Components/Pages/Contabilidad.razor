@@ -2,9 +2,9 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
 
 <PageTitle>Contabilidad</PageTitle>
-<JuntaGuard />
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
@@ -185,8 +185,26 @@ else
     private string Flecha(string campo) =>
         ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
 
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    // Acceso: junta, o el socio Id=4 (tesorero), hasta que se modele un rol propio.
+    private const long IdTesorero = 4;
+
     protected override async Task OnInitializedAsync()
     {
+        if (EstadoAutenticacion is not null)
+        {
+            var estado = await EstadoAutenticacion;
+            var esJunta = SocioAuth.EsJunta(estado.User);
+            var esTesorero = SocioAuth.SocioId(estado.User) == IdTesorero;
+            if (!esJunta && !esTesorero)
+            {
+                Navigation.NavigateTo("/inicio", forceLoad: true);
+                return;
+            }
+        }
+
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();

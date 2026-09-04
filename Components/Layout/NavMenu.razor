@@ -89,7 +89,14 @@
                     <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Resumen limpieza
                 </NavLink>
             </div>
+        }
 
+        @if (esJunta || esTesorero)
+        {
+            @if (!esJunta)
+            {
+                <div class="nav-seccion">Tesorería</div>
+            }
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="contabilidad">
                     <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Contabilidad
@@ -104,6 +111,10 @@
     private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
 
     private bool esJunta;
+    private bool esTesorero;
+
+    // Acceso a Contabilidad: junta, o el socio Id=4 (tesorero), hasta que se modele un rol propio.
+    private const long IdTesorero = 4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -114,5 +125,6 @@
 
         var estado = await EstadoAutenticacion;
         esJunta = SocioAuth.EsJunta(estado.User);
+        esTesorero = SocioAuth.SocioId(estado.User) == IdTesorero;
     }
 }
