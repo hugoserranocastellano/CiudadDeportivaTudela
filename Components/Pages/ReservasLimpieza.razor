@@ -3,12 +3,13 @@
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
-<PageTitle>Limpieza de reservas</PageTitle>
+<PageTitle>Resumen limpieza</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Limpieza de reservas</h1>
-    <a class="btn btn-outline-secondary btn-sm" href="reservas">← Volver a reservas</a>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Resumen limpieza</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="reservas">Ver reservas</a>
 </div>
 
 <p class="text-muted">

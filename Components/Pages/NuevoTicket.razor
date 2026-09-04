@@ -27,6 +27,7 @@ else
             <div class="text-muted">@socio.Nombre @socio.Apellidos · @fecha.ToString("dd/MM/yyyy HH:mm")</div>
         </div>
         <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Volver">← Volver</button>
             <button type="button" class="btn btn-outline-danger" @onclick="Cancelar">Cancelar</button>
             <button type="button" class="btn btn-outline-secondary" disabled="@(lineas.Count == 0 || guardando)" @onclick="Guardar">
                 @(guardando ? "Guardando..." : "Guardar")
@@ -614,6 +615,31 @@ else
         {
             pagando = false;
         }
+    }
+
+    private async Task Volver()
+    {
+        if (huboCambiosSinGuardar)
+        {
+            var guardarAntes = await JS.InvokeAsync<bool>(
+                "confirm",
+                "Tienes cambios sin guardar en el ticket. ¿Quieres guardarlos antes de salir?");
+            if (guardarAntes)
+            {
+                await Guardar();
+                if (error is not null)
+                {
+                    return;
+                }
+            }
+        }
+
+        if (moduloAviso is not null)
+        {
+            await moduloAviso.InvokeVoidAsync("desactivar");
+        }
+
+        Navegacion.NavigateTo("/mis-tickets");
     }
 
     private async Task Cancelar()

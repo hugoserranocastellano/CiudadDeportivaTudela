@@ -3,14 +3,21 @@
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IConfiguration Configuration
+@inject IJSRuntime JS
 
 <PageTitle>Socios</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Socios</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Socios</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nuevo socio</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -193,6 +200,7 @@ else
     private string filtro = string.Empty;
     private string? error;
     private string? diagnostico;
+    private string? mensajeExito;
 
     private string ordenCampo = "nombre";
     private bool ordenDescendente;
@@ -282,7 +290,7 @@ else
         catch (Exception ex)
         {
             socios ??= new List<Socio>();
-            error = ex.Message;
+            error = ex.InnerException?.Message ?? ex.Message;
             DescribirConexion();
         }
     }
@@ -297,9 +305,10 @@ else
         esNuevo = true;
         nuevoPin = string.Empty;
         idBorrando = null;
+        mensajeExito = null;
     }
 
-    private void Editar(Socio socio)
+    private async Task Editar(Socio socio)
     {
         // Copia para que cancelar no deje la fila de la tabla a medio editar.
         edicion = new Socio
@@ -322,6 +331,8 @@ else
         esNuevo = false;
         nuevoPin = string.Empty;
         idBorrando = null;
+        mensajeExito = null;
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
     }
 
     private void Cancelar() => edicion = null;
@@ -334,6 +345,13 @@ else
         }
 
         edicion.Activo = activo;
+
+        // Npgsql exige Kind=Utc para columnas timestamptz; InputDate/DateTime.Today
+        // devuelven Kind=Unspecified y el guardado falla en silencio (mensaje opaco de EF).
+        if (edicion.FechaAlta is DateTime fechaAlta && fechaAlta.Kind != DateTimeKind.Utc)
+        {
+            edicion.FechaAlta = DateTime.SpecifyKind(fechaAlta, DateTimeKind.Utc);
+        }
 
         if (!esNuevo && !string.IsNullOrEmpty(nuevoPin))
         {
@@ -373,12 +391,15 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Socio creado." : "Socio actualizado.";
+            error = null;
+            diagnostico = null;
             edicion = null;
             await Cargar();
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ex.InnerException?.Message ?? ex.Message;
             DescribirConexion();
         }
     }

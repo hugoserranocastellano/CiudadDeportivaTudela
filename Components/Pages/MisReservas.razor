@@ -7,7 +7,7 @@
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
-    <h1 class="mb-0">Mis reservas</h1>
+    <h1 class="mb-0 text-center flex-grow-1">Mis reservas</h1>
     <a class="btn btn-sm btn-pena" href="reservas">Ver calendario</a>
 </div>
 
@@ -52,7 +52,7 @@ else
                     {
                         <tr>
                             <td>@reserva.Id</td>
-                            <td>@reserva.Fecha.ToShortDateString()</td>
+                            <td>@reserva.Fecha.ToString("dd/MM/yyyy")</td>
                             <td class="text-end">@reserva.Comensales</td>
                             <td>@reserva.TipoReserva</td>
                             <td>@reserva.Estado</td>

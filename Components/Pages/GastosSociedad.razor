@@ -6,10 +6,16 @@
 <PageTitle>Gastos de la sociedad</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Gastos de la sociedad</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Gastos de la sociedad</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nuevo gasto</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -83,7 +89,7 @@ else
                 @foreach (var gasto in Ordenados)
                 {
                     <tr>
-                        <td>@gasto.Fecha.ToShortDateString()</td>
+                        <td>@gasto.Fecha.ToString("dd/MM/yyyy")</td>
                         <td>@(gasto.Categoria ?? "—")</td>
                         <td>@gasto.TipoCategoria</td>
                         <td>@gasto.Descripcion</td>
@@ -114,6 +120,7 @@ else
     private bool esNuevo;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private string ordenCampo = "fecha";
     private bool ordenDescendente = true;
@@ -201,6 +208,7 @@ else
         edicion = new GastoSociedad();
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private async Task Editar(long id)
@@ -244,6 +252,7 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Gasto creado." : "Gasto actualizado.";
             edicion = null;
             await Cargar();
         }

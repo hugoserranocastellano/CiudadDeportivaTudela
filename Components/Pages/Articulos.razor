@@ -2,14 +2,21 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
 
 <PageTitle>Artículos</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Artículos</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Artículos</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nuevo artículo</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -138,6 +145,7 @@ else
     private bool activo = true;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private string ordenCampo = "descripcion";
     private bool ordenDescendente;
@@ -215,9 +223,10 @@ else
         activo = true;
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
-    private void Editar(Articulo articulo)
+    private async Task Editar(Articulo articulo)
     {
         edicion = new Articulo
         {
@@ -234,6 +243,8 @@ else
         activo = articulo.Activo != false;
         esNuevo = false;
         idBorrando = null;
+        mensajeExito = null;
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
     }
 
     private void Cancelar() => edicion = null;
@@ -261,12 +272,14 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Artículo creado." : "Artículo actualizado.";
+            error = null;
             edicion = null;
             await Cargar();
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ex.InnerException?.Message ?? ex.Message;
         }
     }
 

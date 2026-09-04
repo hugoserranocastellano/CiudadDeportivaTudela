@@ -6,10 +6,16 @@
 <PageTitle>Líneas de ticket</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Líneas de ticket</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Líneas de ticket</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nueva línea</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -129,6 +135,7 @@ else
     private bool esNuevo;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private decimal Subtotal => (edicion?.PrecioUnidad ?? 0) * (edicion?.Unidades ?? 0);
 
@@ -251,6 +258,7 @@ else
         edicion = new TicketLinea();
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private async Task Editar(long id)
@@ -301,6 +309,7 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Línea creada." : "Línea actualizada.";
             edicion = null;
             await Cargar();
         }

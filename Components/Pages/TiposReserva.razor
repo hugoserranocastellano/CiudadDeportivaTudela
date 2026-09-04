@@ -6,10 +6,16 @@
 <PageTitle>Tipos de reserva</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Tipos de reserva</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Tipos de reserva</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nuevo tipo</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -105,6 +111,7 @@ else
     private bool esNuevo;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private string ordenCampo = "orden";
     private bool ordenDescendente;
@@ -177,6 +184,7 @@ else
         edicion = new TipoReserva();
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private void Editar(TipoReserva tipo)
@@ -216,6 +224,7 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Tipo de reserva creado." : "Tipo de reserva actualizado.";
             edicion = null;
             await Cargar();
         }

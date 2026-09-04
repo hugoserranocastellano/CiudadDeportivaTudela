@@ -6,10 +6,16 @@
 <PageTitle>Categorías de gasto</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Categorías de gasto</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Categorías de gasto</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nueva categoría</button>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -100,6 +106,7 @@ else
     private bool esNuevo;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private string ordenCampo = "tipo";
     private bool ordenDescendente;
@@ -173,6 +180,7 @@ else
         edicion = new CategoriaGasto();
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private void Editar(CategoriaGasto categoria)
@@ -210,6 +218,7 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Categoría creada." : "Categoría actualizada.";
             edicion = null;
             await Cargar();
         }

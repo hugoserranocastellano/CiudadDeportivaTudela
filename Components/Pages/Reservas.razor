@@ -8,9 +8,14 @@
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
-    <h1 class="mb-0">Reservas</h1>
-    <a class="btn btn-outline-secondary btn-sm ms-auto" href="mis-reservas">Mis reservas</a>
+    <h1 class="mb-0 text-center flex-grow-1">Reservas</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="mis-reservas">Mis reservas</a>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -273,6 +278,7 @@ else
     private List<Opcion> socios = new();
     private List<TipoReserva> tipos = new();
     private string? error;
+    private string? mensajeExito;
 
     private DateOnly? diaSeleccionado;
     private List<ReservaFila>? reservasDelDia;
@@ -516,6 +522,7 @@ else
         mesasSeleccionadas = new HashSet<long>();
         limpieza = false;
         errorForm = null;
+        mensajeExito = null;
         _ = CargarMesasDisponibles();
     }
 
@@ -634,6 +641,7 @@ else
             db.Reservas.Add(edicion);
             await db.SaveChangesAsync();
 
+            mensajeExito = "Reserva creada.";
             edicion = null;
             mesasSeleccionadas.Clear();
             errorForm = null;

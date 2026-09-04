@@ -4,17 +4,24 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SupabaseStorageService Storage
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Reuniones</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Reuniones</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Reuniones</h1>
     <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("/eventos")'>Ver Calendario</button>
         <button class="btn btn-pena" @onclick="Nuevo">Nueva reunión</button>
     </div>
 </div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -158,6 +165,7 @@ else
     private bool esNuevo;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private InputFile? inputFile;
     private bool subiendoAdjunto;
@@ -209,6 +217,7 @@ else
             adjuntos = new List<AdjuntoReunion>();
             esNuevo = true;
             idBorrando = null;
+            mensajeExito = null;
             LimpiarAdjuntoForm();
             await Cargar();
         }
@@ -229,7 +238,7 @@ else
         edicion.Visible = tipo?.Junta != true;
     }
 
-    private void Editar(Reunion reunion)
+    private async Task Editar(Reunion reunion)
     {
         edicion = new Reunion
         {
@@ -242,7 +251,9 @@ else
         adjuntos = reunion.Adjuntos.OrderBy(a => a.Nombre).ToList();
         esNuevo = false;
         idBorrando = null;
+        mensajeExito = null;
         LimpiarAdjuntoForm();
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
     }
 
     private async Task Cancelar()
@@ -295,16 +306,13 @@ else
                     .SetProperty(x => x.Titulo, edicion.Titulo)
                     .SetProperty(x => x.TipoReunionId, edicion.TipoReunionId)
                     .SetProperty(x => x.Visible, edicion.Visible));
+
+            mensajeExito = esNuevo ? "Reunión creada." : "Reunión actualizada.";
             esNuevo = false;
-
-            await Cargar();
-            var actualizada = reuniones!.FirstOrDefault(r => r.Id == edicion.Id);
-            if (actualizada is not null)
-            {
-                Editar(actualizada);
-            }
-
+            edicion = null;
+            LimpiarAdjuntoForm();
             error = null;
+            await Cargar();
         }
         catch (Exception ex)
         {

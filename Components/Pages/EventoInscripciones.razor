@@ -6,8 +6,9 @@
 <PageTitle>Inscripciones a eventos</PageTitle>
 <JuntaGuard />
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <h1 class="mb-0">Inscripciones a eventos</h1>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Inscripciones a eventos</h1>
     <button class="btn btn-pena" @onclick="Nuevo">Nueva inscripción</button>
 </div>
 
@@ -15,6 +16,11 @@
     Gestión manual de inscripciones. Para crear eventos y ver plazas/inscritos usa el
     <a href="eventos">calendario de eventos</a>.
 </p>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
 
 @if (error is not null)
 {
@@ -129,6 +135,7 @@ else
     private bool listaEspera;
     private long? idBorrando;
     private string? error;
+    private string? mensajeExito;
 
     private string NombreSocio(long? id) =>
         id is not null && nombresSocio.TryGetValue(id.Value, out var nombre) ? nombre : "—";
@@ -220,6 +227,7 @@ else
         listaEspera = false;
         esNuevo = true;
         idBorrando = null;
+        mensajeExito = null;
     }
 
     private async Task Editar(long id)
@@ -273,6 +281,7 @@ else
             }
 
             await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Inscripción creada." : "Inscripción actualizada.";
             edicion = null;
             await Cargar();
         }
