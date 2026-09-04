@@ -94,6 +94,14 @@
     </EditForm>
 }
 
+@if (articulos is not null && articulos.Count > 0)
+{
+    <div class="mb-3" style="max-width: 22rem;">
+        <input class="form-control" placeholder="Buscar por descripción o proveedor"
+               value="@filtro" @oninput="e => filtro = e.Value?.ToString() ?? string.Empty" />
+    </div>
+}
+
 @if (articulos is null)
 {
     <p><em>Cargando...</em></p>
@@ -102,9 +110,13 @@ else if (articulos.Count == 0)
 {
     <p><em>No hay artículos todavía.</em></p>
 }
+else if (Filtrados.Count == 0)
+{
+    <p><em>No hay artículos que coincidan.</em></p>
+}
 else
 {
-    <p class="text-muted">@articulos.Count artículo(s), @(articulos.Count(BajoMinimo)) bajo mínimo.</p>
+    <p class="text-muted">@Filtrados.Count de @articulos.Count artículo(s), @(articulos.Count(BajoMinimo)) bajo mínimo.</p>
 
     <div class="table-responsive tabla-marco">
         <table class="table table-striped align-middle mb-0">
@@ -144,6 +156,7 @@ else
     private bool esNuevo;
     private bool activo = true;
     private long? idBorrando;
+    private string filtro = string.Empty;
     private string? error;
     private string? mensajeExito;
 
@@ -152,7 +165,7 @@ else
 
     private static bool BajoMinimo(Articulo a) => a.StockActual <= a.StockMinimo;
 
-    private List<Articulo> Ordenados
+    private List<Articulo> Filtrados
     {
         get
         {
@@ -160,6 +173,26 @@ else
             {
                 return new List<Articulo>();
             }
+
+            if (string.IsNullOrWhiteSpace(filtro))
+            {
+                return articulos;
+            }
+
+            var texto = filtro.Trim();
+
+            return articulos
+                .Where(a => a.Descripcion.Contains(texto, StringComparison.OrdinalIgnoreCase)
+                    || (a.Proveedor?.Contains(texto, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+        }
+    }
+
+    private List<Articulo> Ordenados
+    {
+        get
+        {
+            var filtrados = Filtrados;
 
             Func<Articulo, object?> clave = ordenCampo switch
             {
@@ -172,8 +205,8 @@ else
             };
 
             IEnumerable<Articulo> resultado = ordenDescendente
-                ? articulos.OrderByDescending(clave)
-                : articulos.OrderBy(clave);
+                ? filtrados.OrderByDescending(clave)
+                : filtrados.OrderBy(clave);
 
             return resultado.ToList();
         }
