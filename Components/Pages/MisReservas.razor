@@ -59,7 +59,7 @@ else
                             <td>@(reserva.Limpieza == true ? "Sí" : "No")</td>
                             <td>@(reserva.Mesas.Count == 0 ? "—" : string.Join(", ", reserva.Mesas))</td>
                             <td class="text-end text-nowrap">
-                                @if (string.Equals(reserva.Estado, "activa", StringComparison.OrdinalIgnoreCase))
+                                @if (string.Equals(reserva.Estado, "activa", StringComparison.OrdinalIgnoreCase) && reserva.Fecha >= hoy)
                                 {
                                     @if (idCancelando == reserva.Id)
                                     {
@@ -85,6 +85,7 @@ else
     private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
 
     private long? socioId;
+    private readonly DateOnly hoy = DateOnly.FromDateTime(DateTime.Today);
     private List<Fila>? reservas;
     private long? idCancelando;
     private string? error;
@@ -205,7 +206,7 @@ else
             // El filtro por SocioId, además del Id, evita cancelar una reserva ajena
             // aunque alguien manipule el id desde la consola del navegador.
             var filas = await db.Reservas
-                .Where(r => r.Id == id && r.SocioId == socioId)
+                .Where(r => r.Id == id && r.SocioId == socioId && r.Fecha >= hoy)
                 .ExecuteUpdateAsync(r => r.SetProperty(x => x.Estado, "cancelada"));
 
             mensaje = filas > 0 ? "Reserva cancelada." : null;

@@ -1,0 +1,192 @@
+@page "/reservas-limpieza"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Limpieza de reservas</PageTitle>
+<JuntaGuard />
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="mb-0">Limpieza de reservas</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="reservas">← Volver a reservas</a>
+</div>
+
+<p class="text-muted">
+    Reservas activas con el servicio de limpieza marcado. Cuando el socio traiga el sobre de
+    "Limpieza (por persona)" (identificado con el número de reserva), marca aquí que ya está pagada.
+</p>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (filas is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (filas.Count == 0)
+{
+    <p><em>No hay reservas con limpieza pendientes o registradas.</em></p>
+}
+else
+{
+    <p class="text-muted">
+        @filas.Count reserva(s) con limpieza, @filas.Count(f => f.PagadaLimpieza != true) sin pagar todavía.
+    </p>
+
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("socio")'>Socio@(Flecha("socio"))</th>
+                    <th role="button" @onclick='() => Ordenar("tipo")'>Tipo de reserva@(Flecha("tipo"))</th>
+                    <th role="button" @onclick='() => Ordenar("comensales")' class="text-end">Comensales@(Flecha("comensales"))</th>
+                    <th role="button" @onclick='() => Ordenar("pagada")'>Pagada@(Flecha("pagada"))</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Ordenadas)
+                {
+                    <tr class="@(f.PagadaLimpieza != true ? "table-warning" : null)">
+                        <td>@f.Id</td>
+                        <td>@f.Fecha.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                @if (!string.IsNullOrWhiteSpace(f.SocioFoto))
+                                {
+                                    <img src="@f.SocioFoto" alt="@f.SocioNombre" class="rounded-circle" style="width:32px;height:32px;object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <div class="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center" style="width:32px;height:32px;">?</div>
+                                }
+                                <span>@f.SocioNombre</span>
+                            </div>
+                        </td>
+                        <td>@f.TipoReserva</td>
+                        <td class="text-end">@f.Comensales</td>
+                        <td>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="@("pagada" + f.Id)"
+                                       checked="@(f.PagadaLimpieza == true)"
+                                       @onchange="@(e => AlternarPagada(f, (bool)e.Value!))" />
+                                <label class="form-check-label small" for="@("pagada" + f.Id)">
+                                    @(f.PagadaLimpieza == true ? "Sí" : "No")
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? filas;
+    private string? error;
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private List<Fila> Ordenadas
+    {
+        get
+        {
+            if (filas is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => f => f.Id,
+                "socio" => f => f.SocioNombre,
+                "tipo" => f => f.TipoReserva,
+                "comensales" => f => f.Comensales,
+                "pagada" => f => f.PagadaLimpieza,
+                _ => f => f.Fecha,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? filas.OrderByDescending(clave)
+                : filas.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            filas = await db.Reservas
+                .AsNoTracking()
+                .Where(r => r.Estado == "activa" && r.Limpieza == true)
+                .OrderByDescending(r => r.Fecha)
+                .Select(r => new Fila(
+                    r.Id,
+                    r.Fecha,
+                    r.Socio != null ? $"{r.Socio.Nombre} {r.Socio.Apellidos}".Trim() : "(sin socio)",
+                    r.Socio != null ? r.Socio.UrlFoto : null,
+                    r.TipoReserva != null ? r.TipoReserva.Descripcion : "(sin tipo)",
+                    r.Comensales ?? 0,
+                    r.PagadaLimpieza))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            filas ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private async Task AlternarPagada(Fila fila, bool pagada)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Reservas.Where(r => r.Id == fila.Id)
+                .ExecuteUpdateAsync(r => r.SetProperty(x => x.PagadaLimpieza, pagada));
+
+            var indice = filas!.FindIndex(f => f.Id == fila.Id);
+            if (indice >= 0)
+            {
+                filas[indice] = fila with { PagadaLimpieza = pagada };
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private record Fila(
+        long Id, DateOnly Fecha, string SocioNombre, string? SocioFoto,
+        string TipoReserva, int Comensales, bool? PagadaLimpieza);
+}

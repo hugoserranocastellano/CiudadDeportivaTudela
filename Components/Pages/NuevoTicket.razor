@@ -43,10 +43,14 @@ else
     {
         <div class="alert alert-success py-2">@mensajeGuardado</div>
     }
-    @if (avisoLimpieza)
+    @if (reservaLimpiezaPendiente is not null)
     {
         <div class="alert alert-warning py-2">
-            Tienes marcada la limpieza en tu reserva de hoy: recuerda hacer el sobre de "Limpieza (por persona)".
+            Tienes marcada la limpieza en tu reserva de hoy y todavía no está pagada: recuerda hacer el sobre de
+            "Limpieza (por persona)" con el número <strong>#@reservaLimpiezaPendiente.Id</strong> y anotando dentro
+            fecha (@reservaLimpiezaPendiente.Fecha.ToString("dd/MM/yyyy")), nombre (@socio!.Nombre @socio.Apellidos),
+            tipo de reserva (@(reservaLimpiezaPendiente.TipoReserva?.Descripcion ?? "(sin tipo)")) y número de
+            comensales (@reservaLimpiezaPendiente.Comensales).
         </div>
     }
 
@@ -263,7 +267,7 @@ else
     private string? errorPago;
     private string? mensajeGuardado;
     private bool huboCambiosSinGuardar;
-    private bool avisoLimpieza;
+    private Reserva? reservaLimpiezaPendiente;
 
     // Se paga aparte con un sobre, no como línea de ticket.
     private const string DescripcionArticuloLimpieza = "Limpieza (por persona)";
@@ -322,9 +326,10 @@ else
             }
 
             var fechaTicket = DateOnly.FromDateTime(fecha);
-            avisoLimpieza = await db.Reservas.AsNoTracking()
-                .AnyAsync(r => r.SocioId == socioId && r.Fecha == fechaTicket
-                    && r.Estado == "activa" && r.Limpieza == true);
+            reservaLimpiezaPendiente = await db.Reservas.AsNoTracking()
+                .Include(r => r.TipoReserva)
+                .FirstOrDefaultAsync(r => r.SocioId == socioId && r.Fecha == fechaTicket
+                    && r.Estado == "activa" && r.Limpieza == true && r.PagadaLimpieza != true);
         }
         catch (Exception ex)
         {

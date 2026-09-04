@@ -177,6 +177,7 @@ else
             reuniones = await db.Reuniones
                 .AsNoTracking()
                 .Include(r => r.TipoReunion)
+                .Include(r => r.Adjuntos)
                 .OrderByDescending(r => r.FechaPrevista)
                 .ToListAsync();
 

@@ -24,12 +24,12 @@
 </p>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
-    <button class="btn btn-outline-secondary" @onclick="MesAnterior">← Mes anterior</button>
+    <button class="btn btn-outline-secondary" @onclick="MesAnterior">← Ant.</button>
     <div class="text-center flex-grow-1">
         <div class="h4 mb-0 text-capitalize">@mesActual.ToString("MMMM", CultureInfo.GetCultureInfo("es-ES"))</div>
         <div class="text-muted">@mesActual.Year</div>
     </div>
-    <button class="btn btn-outline-secondary" @onclick="MesSiguiente">Mes siguiente →</button>
+    <button class="btn btn-outline-secondary" @onclick="MesSiguiente">Sig. →</button>
 </div>
 
 @if (dias is null)
@@ -368,6 +368,10 @@ else
     private string ClaseDia(DateOnly celda)
     {
         var clases = new List<string> { "dia-habilitado" };
+        if (celda.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            clases.Add("dia-finde");
+        }
         if (eventosPorFecha.TryGetValue(celda, out var eventosDia))
         {
             clases.Add(eventosDia.Any(e => e.Obligatorio == true) ? "dia-evento-obligatorio" : "dia-evento-opcional");

@@ -28,12 +28,12 @@
 </p>
 
 <div class="d-flex align-items-center justify-content-between mb-3">
-    <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Mes anterior</button>
+    <button class="btn btn-outline-secondary" disabled="@(!PuedeRetroceder)" @onclick="MesAnterior">← Ant.</button>
     <div class="text-center flex-grow-1">
         <div class="h4 mb-0 text-capitalize">@mesActual.ToString("MMMM", CultureInfo.GetCultureInfo("es-ES"))</div>
         <div class="text-muted">@mesActual.Year</div>
     </div>
-    <button class="btn btn-outline-secondary" disabled="@(!PuedeAvanzar)" @onclick="MesSiguiente">Mes siguiente →</button>
+    <button class="btn btn-outline-secondary" disabled="@(!PuedeAvanzar)" @onclick="MesSiguiente">Sig. →</button>
 </div>
 
 @if (dias is null)
@@ -140,7 +140,7 @@ else
                                         }
                                     </div>
                                 </div>
-                                @if (esJunta || r.SocioId == socioId)
+                                @if ((esJunta || r.SocioId == socioId) && diaSeleccionado.Value >= hoy)
                                 {
                                     @if (idCancelando == r.Id)
                                     {
@@ -316,6 +316,10 @@ else
         }
 
         var clases = new List<string> { "dia-habilitado" };
+        if (celda.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            clases.Add("dia-finde");
+        }
         if (TieneReserva(celda))
         {
             clases.Add("dia-reserva");
@@ -650,7 +654,7 @@ else
         {
             await using var db = await DbFactory.CreateDbContextAsync();
 
-            IQueryable<Reserva> consulta = db.Reservas.Where(r => r.Id == id && r.Estado == "activa");
+            IQueryable<Reserva> consulta = db.Reservas.Where(r => r.Id == id && r.Estado == "activa" && r.Fecha >= hoy);
             if (!esJunta)
             {
                 // Defensa por si se manipula el botón desde el cliente: un socio sólo cancela lo suyo.

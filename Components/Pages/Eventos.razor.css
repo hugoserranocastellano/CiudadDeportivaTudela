@@ -6,6 +6,14 @@
     text-align: center;
 }
 
+.calendario-eventos td.dia-finde {
+    background-color: #e9ecef;
+}
+
+.calendario-eventos td.dia-finde .dia-numero {
+    font-weight: 700;
+}
+
 .calendario-eventos td.dia-hoy {
     background-color: #c3e6cb;
     outline: 2px solid #198754;
