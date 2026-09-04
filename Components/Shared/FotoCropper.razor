@@ -12,7 +12,18 @@
             @* El fichero siempre se llama igual (id.jpg), así que la URL nunca
                cambia entre subidas: sin este parámetro el navegador seguiría
                mostrando la foto vieja cacheada tras subir una nueva. *@
-            <img src="@($"{FotoActualUrl}?v={sufijoCache}")" alt="Foto actual" style="max-height:220px" class="rounded" />
+            <img src="@($"{FotoActualUrl}?v={sufijoCache}")" alt="Foto actual" style="max-height:220px" class="rounded d-block mb-1" />
+            @if (confirmandoBorrado)
+            {
+                <button type="button" class="btn btn-sm btn-danger" disabled="@borrando" @onclick="ConfirmarBorrado">
+                    @(borrando ? "Borrando..." : "Confirmar borrado")
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@borrando" @onclick="() => confirmandoBorrado = false">No</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@Disabled" @onclick="() => confirmandoBorrado = true">Borrar foto</button>
+            }
         </div>
     }
 
@@ -67,6 +78,9 @@
     [Parameter]
     public EventCallback<string> FotoSubida { get; set; }
 
+    [Parameter]
+    public EventCallback FotoBorrada { get; set; }
+
     private readonly string canvasId = $"fotoCropper-{Guid.NewGuid():N}";
     private string sufijoCache = Guid.NewGuid().ToString("N");
     private InputFile? inputFile;
@@ -75,6 +89,8 @@
     private bool subiendo;
     private bool subida;
     private bool cargado;
+    private bool confirmandoBorrado;
+    private bool borrando;
     private string? error;
 
     private async Task<IJSObjectReference> ModuloAsync()
@@ -162,6 +178,27 @@
         finally
         {
             subiendo = false;
+        }
+    }
+
+    private async Task ConfirmarBorrado()
+    {
+        borrando = true;
+        error = null;
+        try
+        {
+            await Storage.BorrarAsync(Bucket, $"{Path}.jpg");
+            subida = false;
+            confirmandoBorrado = false;
+            await FotoBorrada.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            borrando = false;
         }
     }
 

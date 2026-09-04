@@ -107,7 +107,8 @@
                     else
                     {
                         <FotoCropper Bucket="Socios" Path="@edicion.Id.ToString()" FotoActualUrl="@edicion.UrlFoto"
-                                     FotoSubida="@(url => edicion.UrlFoto = url)" />
+                                     FotoSubida="@(url => edicion.UrlFoto = url)"
+                                     FotoBorrada="() => BorrarFoto(edicion.Id)" />
                     }
                 </div>
                 <div class="col-md-2">
@@ -336,6 +337,26 @@ else
     }
 
     private void Cancelar() => edicion = null;
+
+    private async Task BorrarFoto(long id)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Socios.Where(s => s.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.UrlFoto, (string?)null));
+
+            if (edicion?.Id == id)
+            {
+                edicion.UrlFoto = null;
+            }
+
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+        }
+    }
 
     private async Task Guardar()
     {

@@ -57,7 +57,8 @@ else
                     <div class="col-md-4">
                         <label class="form-label">Foto</label>
                         <FotoCropper Bucket="Socios" Path="@socioId?.ToString()" FotoActualUrl="@datosEdicion!.UrlFoto"
-                                     FotoSubida="@(url => datosEdicion.UrlFoto = url)" />
+                                     FotoSubida="@(url => datosEdicion.UrlFoto = url)"
+                                     FotoBorrada="BorrarFoto" />
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Cuenta bancaria</label>
@@ -378,6 +379,27 @@ else
             editandoDatos = false;
             mensaje = "Datos actualizados.";
             error = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task BorrarFoto()
+    {
+        if (socioId is null || datosEdicion is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Socios.Where(s => s.Id == socioId).ExecuteUpdateAsync(s => s.SetProperty(x => x.UrlFoto, (string?)null));
+
+            datosEdicion.UrlFoto = null;
             await Cargar();
         }
         catch (Exception ex)
