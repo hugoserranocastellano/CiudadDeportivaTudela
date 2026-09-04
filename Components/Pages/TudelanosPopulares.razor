@@ -1,0 +1,292 @@
+@page "/tudelanos-populares"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SupabaseStorageService Storage
+@inject IJSRuntime JS
+
+<PageTitle>Tudelanos Populares</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Tudelanos Populares</h1>
+    @if (esJunta)
+    {
+        <button class="btn btn-pena" @onclick="Nuevo">Nuevo</button>
+    }
+</div>
+
+@if (mensajeExito is not null)
+{
+    <div class="alert alert-success py-2">@mensajeExito</div>
+}
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+@if (esJunta && edicion is not null)
+{
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">@(esNuevo ? "Nuevo Tudelano Popular" : $"Editar «{edicion.Nombre}»")</div>
+        <div class="card-body">
+            @if (errorForm is not null)
+            {
+                <div class="alert alert-danger py-2">@errorForm</div>
+            }
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Año</label>
+                    <input class="form-control" @bind="edicion.Anio" @bind:event="oninput" placeholder="ej. 2025" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Nombre</label>
+                    <input class="form-control" @bind="edicion.Nombre" @bind:event="oninput" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Foto</label>
+                    @if (esNuevo)
+                    {
+                        <div class="form-text">Guarda primero para poder subir la foto.</div>
+                    }
+                    else
+                    {
+                        <FotoCropper Bucket="TudelanosPopulares" Path="@edicion.Id.ToString()" FotoActualUrl="@edicion.UrlFoto"
+                                     FotoSubida="@(url => edicion.UrlFoto = url)"
+                                     FotoBorrada="() => BorrarFoto(edicion.Id)" />
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="button" class="btn btn-pena" @onclick="Guardar">Guardar</button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+            @if (!esNuevo)
+            {
+                @if (idBorrando == edicion.Id)
+                {
+                    <button type="button" class="btn btn-danger ms-auto" @onclick="() => Borrar(edicion.Id)">Confirmar borrado</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => idBorrando = null">No</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-danger ms-auto" @onclick="() => idBorrando = edicion.Id">Borrar</button>
+                }
+            }
+        </div>
+    </div>
+}
+
+@if (lista is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (lista.Count == 0)
+{
+    <p><em>No hay Tudelanos Populares todavía.</em></p>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-4 g-3">
+        @foreach (var t in lista)
+        {
+            <div class="col">
+                <div class="card h-100 text-center">
+                    @if (!string.IsNullOrWhiteSpace(t.UrlFoto))
+                    {
+                        <img src="@t.UrlFoto" alt="@t.Nombre" style="width:100%;height:180px;object-fit:cover;" />
+                    }
+                    else
+                    {
+                        <div class="bg-light d-flex align-items-center justify-content-center" style="height:180px;">
+                            <span class="text-muted">Sin foto</span>
+                        </div>
+                    }
+                    <div class="card-body">
+                        <div class="fw-bold">@t.Anio</div>
+                        <div>@t.Nombre</div>
+                        @if (esJunta)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="() => Editar(t)">Editar</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoAutenticacion { get; set; }
+
+    private bool esJunta;
+    private List<TudelanoPopular>? lista;
+    private TudelanoPopular? edicion;
+    private bool esNuevo;
+    private long? idBorrando;
+    private string? error;
+    private string? errorForm;
+    private string? mensajeExito;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoAutenticacion is not null)
+        {
+            var estado = await EstadoAutenticacion;
+            esJunta = SocioAuth.EsJunta(estado.User);
+        }
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            lista = await db.TudelanosPopulares
+                .AsNoTracking()
+                .OrderByDescending(t => t.Anio)
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            lista ??= new List<TudelanoPopular>();
+            error = ex.Message;
+        }
+    }
+
+    private void Nuevo()
+    {
+        edicion = new TudelanoPopular();
+        esNuevo = true;
+        idBorrando = null;
+        errorForm = null;
+        mensajeExito = null;
+    }
+
+    private async Task Editar(TudelanoPopular t)
+    {
+        edicion = new TudelanoPopular
+        {
+            Id = t.Id,
+            Anio = t.Anio,
+            Nombre = t.Nombre,
+            UrlFoto = t.UrlFoto,
+        };
+        esNuevo = false;
+        idBorrando = null;
+        errorForm = null;
+        mensajeExito = null;
+        await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+    }
+
+    private void Cancelar() => edicion = null;
+
+    private async Task Guardar()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(edicion.Anio) || string.IsNullOrWhiteSpace(edicion.Nombre))
+        {
+            errorForm = "Indica año y nombre.";
+            return;
+        }
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (esNuevo)
+            {
+                db.TudelanosPopulares.Add(edicion);
+            }
+            else
+            {
+                db.TudelanosPopulares.Update(edicion);
+            }
+
+            await db.SaveChangesAsync();
+            mensajeExito = esNuevo ? "Tudelano Popular creado." : "Tudelano Popular actualizado.";
+            error = null;
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            errorForm = ex.InnerException?.Message ?? ex.Message;
+        }
+    }
+
+    private async Task BorrarFoto(long id)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.TudelanosPopulares.Where(t => t.Id == id)
+                .ExecuteUpdateAsync(t => t.SetProperty(x => x.UrlFoto, (string?)null));
+
+            if (edicion?.Id == id)
+            {
+                edicion.UrlFoto = null;
+            }
+
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Borrar(long id)
+    {
+        idBorrando = null;
+
+        try
+        {
+            var t = lista?.FirstOrDefault(x => x.Id == id);
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.TudelanosPopulares.Where(x => x.Id == id).ExecuteDeleteAsync();
+
+            if (t is not null)
+            {
+                await BorrarFotoDeStorageSiPropia(t.UrlFoto);
+            }
+
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task BorrarFotoDeStorageSiPropia(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        var marcador = "/object/public/TudelanosPopulares/";
+        var indice = url.IndexOf(marcador, StringComparison.Ordinal);
+        if (indice < 0)
+        {
+            return;
+        }
+
+        var ruta = url[(indice + marcador.Length)..];
+        await Storage.BorrarAsync("TudelanosPopulares", ruta);
+    }
+}
