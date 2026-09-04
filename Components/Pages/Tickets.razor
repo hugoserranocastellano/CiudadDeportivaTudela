@@ -104,7 +104,13 @@ else
                         <td>@NombreSocio(ticket.SocioId)</td>
                         <td class="text-end">@ticket.NumeroLineas</td>
                         <td class="text-end">@((ticket.ImporteTotal ?? 0).ToString("N2")) €</td>
-                        <td>@(ticket.Revisado == true ? "Sí" : "No")</td>
+                        <td>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="@("revisado" + ticket.Id)"
+                                       checked="@(ticket.Revisado == true)"
+                                       @onchange="@(e => AlternarRevisado(ticket, (bool)e.Value!))" />
+                            </div>
+                        </td>
                         <td>
                             @if (ticket.Estado == "abierto")
                             {
@@ -280,6 +286,26 @@ else
     }
 
     private void Cancelar() => edicion = null;
+
+    private async Task AlternarRevisado(Fila ticket, bool revisado)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Tickets.Where(t => t.Id == ticket.Id)
+                .ExecuteUpdateAsync(t => t.SetProperty(x => x.Revisado, revisado));
+
+            var indice = tickets!.FindIndex(t => t.Id == ticket.Id);
+            if (indice >= 0)
+            {
+                tickets[indice] = ticket with { Revisado = revisado };
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
 
     private async Task Guardar()
     {
