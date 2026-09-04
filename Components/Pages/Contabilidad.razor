@@ -1,0 +1,274 @@
+@page "/contabilidad"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Contabilidad</PageTitle>
+<JuntaGuard />
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="inicio">← Volver</a>
+    <h1 class="mb-0 text-center flex-grow-1">Contabilidad</h1>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert"><code>@error</code></div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Desde</label>
+                <input type="date" class="form-control" value="@filtroDesde?.ToString("yyyy-MM-dd")"
+                       @onchange="e => filtroDesde = ParseFecha(e.Value)" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Hasta</label>
+                <input type="date" class="form-control" value="@filtroHasta?.ToString("yyyy-MM-dd")"
+                       @onchange="e => filtroHasta = ParseFecha(e.Value)" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Socio</label>
+                <InputSelect class="form-select" @bind-Value="filtroSocioId">
+                    <option value="">(todos)</option>
+                    @foreach (var socio in socios)
+                    {
+                        <option value="@socio.Id">@socio.Texto</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Estado</label>
+                <InputSelect class="form-select" @bind-Value="filtroEstado">
+                    <option value="">(todos)</option>
+                    <option value="pagado">Pagado</option>
+                    <option value="abierto">Abierto</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="button" class="btn btn-pena" @onclick="Cargar">Filtrar</button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="Limpiar">Limpiar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (tickets is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (tickets.Count == 0)
+{
+    <p><em>No hay tickets que coincidan con el filtro.</em></p>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Ingresado (pagado)</div>
+                    <div class="fs-4 fw-bold text-success">@TotalPagado.ToString("N2") €</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pendiente (abierto)</div>
+                    <div class="fs-4 fw-bold text-warning">@TotalAbierto.ToString("N2") €</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total tickets</div>
+                    <div class="fs-4 fw-bold">@tickets.Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive tabla-marco">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th role="button" @onclick='() => Ordenar("id")'>#@(Flecha("id"))</th>
+                    <th role="button" @onclick='() => Ordenar("fecha")'>Fecha@(Flecha("fecha"))</th>
+                    <th role="button" @onclick='() => Ordenar("socio")'>Socio@(Flecha("socio"))</th>
+                    <th class="text-end" role="button" @onclick='() => Ordenar("importe")'>Importe@(Flecha("importe"))</th>
+                    <th role="button" @onclick='() => Ordenar("estado")'>Estado@(Flecha("estado"))</th>
+                    <th role="button" @onclick='() => Ordenar("formaPago")'>Forma de pago@(Flecha("formaPago"))</th>
+                    <th role="button" @onclick='() => Ordenar("revisado")'>Revisado@(Flecha("revisado"))</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Ordenados)
+                {
+                    <tr class="@(t.Estado == "abierto" ? "table-warning" : null)">
+                        <td>@t.Id</td>
+                        <td>@t.Fecha?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@t.SocioNombre</td>
+                        <td class="text-end">@((t.ImporteTotal ?? 0).ToString("N2")) €</td>
+                        <td>@t.Estado</td>
+                        <td>@(t.FormaPago ?? "—")</td>
+                        <td>@(t.Revisado == true ? "Sí" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Fila>? tickets;
+    private List<Opcion> socios = new();
+    private DateOnly? filtroDesde;
+    private DateOnly? filtroHasta;
+    private string filtroSocioId = string.Empty;
+    private string filtroEstado = string.Empty;
+    private string? error;
+
+    private string ordenCampo = "fecha";
+    private bool ordenDescendente = true;
+
+    private decimal TotalPagado => tickets?.Where(t => t.Estado == "pagado").Sum(t => t.ImporteTotal ?? 0) ?? 0;
+    private decimal TotalAbierto => tickets?.Where(t => t.Estado == "abierto").Sum(t => t.ImporteTotal ?? 0) ?? 0;
+
+    private static DateOnly? ParseFecha(object? valor) =>
+        DateOnly.TryParse(valor?.ToString(), out var f) ? f : null;
+
+    private List<Fila> Ordenados
+    {
+        get
+        {
+            if (tickets is null)
+            {
+                return new List<Fila>();
+            }
+
+            Func<Fila, object?> clave = ordenCampo switch
+            {
+                "id" => t => t.Id,
+                "socio" => t => t.SocioNombre,
+                "importe" => t => t.ImporteTotal,
+                "estado" => t => t.Estado,
+                "formaPago" => t => t.FormaPago,
+                "revisado" => t => t.Revisado,
+                _ => t => t.Fecha,
+            };
+
+            IEnumerable<Fila> resultado = ordenDescendente
+                ? tickets.OrderByDescending(clave)
+                : tickets.OrderBy(clave);
+
+            return resultado.ToList();
+        }
+    }
+
+    private void Ordenar(string campo)
+    {
+        if (ordenCampo == campo)
+        {
+            ordenDescendente = !ordenDescendente;
+        }
+        else
+        {
+            ordenCampo = campo;
+            ordenDescendente = false;
+        }
+    }
+
+    private string Flecha(string campo) =>
+        ordenCampo != campo ? string.Empty : ordenDescendente ? " ▼" : " ▲";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            socios = (await db.Socios
+                    .AsNoTracking()
+                    .OrderBy(s => s.Nombre)
+                    .Select(s => new { s.Id, s.Dni, s.Nombre, s.Apellidos })
+                    .ToListAsync())
+                .Select(s => new Opcion(s.Id, $"{s.Dni} · {s.Nombre} {s.Apellidos}".TrimEnd()))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+
+        await Cargar();
+    }
+
+    private void Limpiar()
+    {
+        filtroDesde = null;
+        filtroHasta = null;
+        filtroSocioId = string.Empty;
+        filtroEstado = string.Empty;
+        _ = Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            IQueryable<Ticket> consulta = db.Tickets.AsNoTracking();
+
+            if (filtroDesde is DateOnly desde)
+            {
+                var desdeUtc = desde.ToDateTime(TimeOnly.MinValue);
+                consulta = consulta.Where(t => t.Fecha >= desdeUtc);
+            }
+
+            if (filtroHasta is DateOnly hasta)
+            {
+                var hastaUtc = hasta.ToDateTime(TimeOnly.MaxValue);
+                consulta = consulta.Where(t => t.Fecha <= hastaUtc);
+            }
+
+            if (long.TryParse(filtroSocioId, out var socioId))
+            {
+                consulta = consulta.Where(t => t.SocioId == socioId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(filtroEstado))
+            {
+                consulta = consulta.Where(t => t.Estado == filtroEstado);
+            }
+
+            tickets = await consulta
+                .Select(t => new Fila(
+                    t.Id,
+                    t.Fecha,
+                    t.Socio != null ? $"{t.Socio.Nombre} {t.Socio.Apellidos}".Trim() : "(sin socio)",
+                    t.ImporteTotal,
+                    t.Estado,
+                    t.FormaPago,
+                    t.Revisado))
+                .ToListAsync();
+
+            error = null;
+        }
+        catch (Exception ex)
+        {
+            tickets ??= new List<Fila>();
+            error = ex.Message;
+        }
+    }
+
+    private record Fila(
+        long Id, DateTime? Fecha, string SocioNombre, decimal? ImporteTotal,
+        string Estado, string? FormaPago, bool? Revisado);
+
+    private record Opcion(long Id, string Texto);
+}

@@ -46,6 +46,8 @@ public class ApplicationDbContext : DbContext
 
     public DbSet<AdjuntoReunion> AdjuntosReunion => Set<AdjuntoReunion>();
 
+    public DbSet<DocumentoOficial> DocumentosOficiales => Set<DocumentoOficial>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Socio>(entity =>
@@ -352,5 +354,15 @@ public class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<DocumentoOficial>(entity =>
+        {
+            entity.ToTable("documentos_oficiales");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id_documento");
+            entity.Property(e => e.FechaValidez).HasColumnName("FechaValidez").HasColumnType("date");
+            entity.Property(e => e.Titulo).HasColumnName("TituloDocumento").IsRequired();
+            entity.Property(e => e.Url).HasColumnName("URL_documento").IsRequired();
+        });
     }
 }
