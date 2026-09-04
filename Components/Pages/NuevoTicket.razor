@@ -63,6 +63,36 @@ else
         </div>
     }
 
+    @if (mostrarPago && ticketId is not null && instruccionesPendientes is not null)
+    {
+        <div style="position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; display:flex; align-items:center; justify-content:center; padding:1rem;">
+            <div class="card shadow" style="max-width:420px; width:100%;">
+                <div class="card-body text-center">
+                    <h5 class="mb-3">Antes de pagar</h5>
+                    @if (instruccionesPendientes == "tarjeta")
+                    {
+                        <div class="alert alert-warning py-2 text-center mb-3">
+                            <div class="fw-bold">APUNTA EL Nº DE TICKET EN EL TICKET DEL TPV:</div>
+                            <div class="fw-bold fs-5">Nº TICKET: #@ticketId</div>
+                            <div class="fw-bold mt-2">Y MÉTELO EN EL BUZÓN</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning py-2 text-center mb-3">
+                            <div class="fw-bold">APUNTA EN EL SOBRE:</div>
+                            <div class="fw-bold">NOMBRE: @socio!.Nombre @socio.Apellidos</div>
+                            <div class="fw-bold">FECHA: @fecha.ToString("dd/MM/yyyy")</div>
+                            <div class="fw-bold">IMPORTE: @Total.ToString("0.00")€</div>
+                            <div class="fw-bold fs-5">Nº TICKET: #@ticketId</div>
+                        </div>
+                    }
+                    <button type="button" class="btn btn-pena w-100" @onclick="ConfirmarInstrucciones">Entendido</button>
+                </div>
+            </div>
+        </div>
+    }
+
     @if (mostrarPago)
     {
         <div class="card mb-3">
@@ -82,26 +112,21 @@ else
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6>He pagado con tarjeta (TPV)</h6>
-                                @if (ticketId is not null)
+                                @if (ticketId is null)
                                 {
-                                    <div class="alert alert-warning py-2 text-center">
-                                        <div class="fw-bold">METE EN EL SOBRE EL TICKET DEL TPV</div>
-                                        <div>Y apunta en el sobre:</div>
-                                        <div class="fw-bold">NOMBRE: @socio!.Nombre @socio.Apellidos</div>
-                                        <div class="fw-bold">FECHA: @fecha.ToString("dd/MM/yyyy")</div>
-                                        <div class="fw-bold">IMPORTE: @Total.ToString("0.00")€</div>
-                                        <div class="fw-bold fs-5">Nº TICKET: #@ticketId</div>
-                                    </div>
+                                    <p class="text-muted small"><em>Pulsa "Guardar" primero para poder subir la foto.</em></p>
                                 }
-                                <p class="text-muted small">Sube una foto del recibo del TPV.</p>
-                                @if (ticketId is long id)
+                                else if (!entendidoTarjeta)
                                 {
-                                    <FotoCropper Bucket="Tickets" Path="@id.ToString()" Disabled="@pagando"
-                                                 FotoSubida="PagarConTarjeta" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick='() => instruccionesPendientes = "tarjeta"'>
+                                        Ver instrucciones y continuar
+                                    </button>
                                 }
                                 else
                                 {
-                                    <p class="text-muted small"><em>Pulsa "Guardar" primero para poder subir la foto.</em></p>
+                                    <p class="text-muted small">Sube una foto del recibo del TPV.</p>
+                                    <FotoCropper Bucket="Tickets" Path="@ticketId.ToString()" Disabled="@pagando"
+                                                 FotoSubida="PagarConTarjeta" />
                                 }
                             </div>
                         </div>
@@ -110,22 +135,24 @@ else
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6>Pagar en metálico</h6>
-                                @if (ticketId is not null)
+                                @if (ticketId is null)
                                 {
-                                    <div class="alert alert-warning py-2 text-center">
-                                        <div class="fw-bold">APUNTAR EN EL SOBRE:</div>
-                                        <div class="fw-bold">NOMBRE: @socio!.Nombre @socio.Apellidos</div>
-                                        <div class="fw-bold">FECHA: @fecha.ToString("dd/MM/yyyy")</div>
-                                        <div class="fw-bold">IMPORTE: @Total.ToString("0.00")€</div>
-                                        <div class="fw-bold fs-5">Nº TICKET: #@ticketId</div>
-                                    </div>
-                                    <button type="button" class="btn btn-pena" disabled="@pagando" @onclick="PagarEnEfectivo">
-                                        @(pagando ? "Confirmando..." : "Confirmar pago en efectivo")
+                                    <p class="text-muted small"><em>Pulsa "Guardar" primero.</em></p>
+                                }
+                                else if (!entendidoEfectivo)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary" @onclick='() => instruccionesPendientes = "efectivo"'>
+                                        Ver instrucciones y continuar
                                     </button>
                                 }
                                 else
                                 {
-                                    <p class="text-muted small"><em>Pulsa "Guardar" primero.</em></p>
+                                    <p class="text-muted small">
+                                        Número de ticket: <strong class="fs-5">#@ticketId</strong>
+                                    </p>
+                                    <button type="button" class="btn btn-pena" disabled="@pagando" @onclick="PagarEnEfectivo">
+                                        @(pagando ? "Confirmando..." : "Confirmar pago en efectivo")
+                                    </button>
                                 }
                             </div>
                         </div>
@@ -278,6 +305,9 @@ else
 
     private string? error;
     private bool mostrarPago;
+    private string? instruccionesPendientes;
+    private bool entendidoTarjeta;
+    private bool entendidoEfectivo;
     private bool pagando;
     private bool guardando;
     private string? errorPago;
@@ -580,6 +610,23 @@ else
 
         mostrarPago = true;
         errorPago = null;
+        instruccionesPendientes = null;
+        entendidoTarjeta = false;
+        entendidoEfectivo = false;
+    }
+
+    private void ConfirmarInstrucciones()
+    {
+        if (instruccionesPendientes == "tarjeta")
+        {
+            entendidoTarjeta = true;
+        }
+        else if (instruccionesPendientes == "efectivo")
+        {
+            entendidoEfectivo = true;
+        }
+
+        instruccionesPendientes = null;
     }
 
     private async Task PagarConTarjeta(string urlRecibo)
