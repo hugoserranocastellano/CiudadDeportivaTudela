@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager Navigation
+@inject SupabaseStorageService Storage
 
 <PageTitle>Contabilidad</PageTitle>
 
@@ -55,6 +56,66 @@
     </div>
 </div>
 
+@if (edicion is not null)
+{
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Editar ticket #@edicion.Id</div>
+        <div class="card-body">
+            @if (errorEdicion is not null)
+            {
+                <div class="alert alert-danger py-2">@errorEdicion</div>
+            }
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Fecha</label>
+                    <input type="datetime-local" class="form-control" value="@edicion.Fecha?.ToString("yyyy-MM-ddTHH:mm")"
+                           @onchange="e => edicion.Fecha = DateTime.TryParse(e.Value?.ToString(), out var f) ? f : edicion.Fecha" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Socio</label>
+                    <InputSelect class="form-select" @bind-Value="edicionSocioId">
+                        <option value="">(sin socio)</option>
+                        @foreach (var s in socios)
+                        {
+                            <option value="@s.Id">@s.Texto</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Importe</label>
+                    <input type="number" step="0.01" class="form-control" @bind="edicion.ImporteTotal" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Estado</label>
+                    <InputSelect class="form-select" @bind-Value="edicion.Estado">
+                        <option value="abierto">Abierto</option>
+                        <option value="pagado">Pagado</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Forma de pago</label>
+                    <InputSelect class="form-select" @bind-Value="edicionFormaPago">
+                        <option value="">(ninguna)</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="efectivo">Efectivo</option>
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Foto del ticket</label>
+                    <FotoCropper Bucket="Tickets" Path="@edicion.Id.ToString()" FotoActualUrl="@edicionFotoUrl"
+                                 FotoSubida="url => edicionFotoUrl = url" FotoBorrada="() => edicionFotoUrl = null" />
+                </div>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="button" class="btn btn-pena" disabled="@guardandoEdicion" @onclick="GuardarEdicion">
+                @(guardandoEdicion ? "Guardando..." : "Guardar")
+            </button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="() => edicion = null">Cancelar</button>
+        </div>
+    </div>
+}
+
 @if (tickets is null)
 {
     <p><em>Cargando...</em></p>
@@ -103,6 +164,7 @@ else
                     <th role="button" @onclick='() => Ordenar("estado")'>Estado@(Flecha("estado"))</th>
                     <th role="button" @onclick='() => Ordenar("formaPago")'>Forma de pago@(Flecha("formaPago"))</th>
                     <th role="button" @onclick='() => Ordenar("revisado")'>Revisado@(Flecha("revisado"))</th>
+                    <th>Foto</th>
                     <th class="text-end">Acciones</th>
                 </tr>
             </thead>
@@ -123,7 +185,16 @@ else
                                        @onchange="@(e => AlternarRevisado(t, (bool)e.Value!))" />
                             </div>
                         </td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(t.UrlFotoTicket))
+                            {
+                                <a href="@t.UrlFotoTicket" target="_blank">
+                                    <img src="@t.UrlFotoTicket" alt="Foto ticket" style="width:40px;height:40px;object-fit:cover;" class="rounded" />
+                                </a>
+                            }
+                        </td>
                         <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(t)">Editar</button>
                             @if (idBorrando == t.Id)
                             {
                                 <button class="btn btn-sm btn-danger" @onclick="() => Borrar(t.Id)">Confirmar</button>
@@ -150,6 +221,13 @@ else
     private string filtroEstado = string.Empty;
     private string? error;
     private long? idBorrando;
+
+    private Ticket? edicion;
+    private string edicionSocioId = string.Empty;
+    private string edicionFormaPago = string.Empty;
+    private string? edicionFotoUrl;
+    private bool guardandoEdicion;
+    private string? errorEdicion;
 
     private string ordenCampo = "fecha";
     private bool ordenDescendente = true;
@@ -287,11 +365,13 @@ else
                 .Select(t => new Fila(
                     t.Id,
                     t.Fecha,
+                    t.SocioId,
                     t.Socio != null ? $"{t.Socio.Nombre} {t.Socio.Apellidos}".Trim() : "(sin socio)",
                     t.ImporteTotal,
                     t.Estado,
                     t.FormaPago,
-                    t.Revisado))
+                    t.Revisado,
+                    t.UrlFotoTicket))
                 .ToListAsync();
 
             error = null;
@@ -323,6 +403,61 @@ else
         }
     }
 
+    private void Editar(Fila fila)
+    {
+        edicion = new Ticket
+        {
+            Id = fila.Id,
+            Fecha = fila.Fecha,
+            SocioId = fila.SocioId,
+            ImporteTotal = fila.ImporteTotal,
+            Estado = fila.Estado,
+            FormaPago = fila.FormaPago,
+            Revisado = fila.Revisado,
+        };
+        edicionSocioId = fila.SocioId?.ToString() ?? string.Empty;
+        edicionFormaPago = fila.FormaPago ?? string.Empty;
+        edicionFotoUrl = fila.UrlFotoTicket;
+        errorEdicion = null;
+        idBorrando = null;
+    }
+
+    private async Task GuardarEdicion()
+    {
+        if (edicion is null)
+        {
+            return;
+        }
+
+        guardandoEdicion = true;
+        errorEdicion = null;
+        try
+        {
+            long? socioId = long.TryParse(edicionSocioId, out var sId) ? sId : null;
+            string? formaPago = string.IsNullOrWhiteSpace(edicionFormaPago) ? null : edicionFormaPago;
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await db.Tickets.Where(t => t.Id == edicion.Id).ExecuteUpdateAsync(t => t
+                .SetProperty(x => x.Fecha, edicion.Fecha)
+                .SetProperty(x => x.SocioId, socioId)
+                .SetProperty(x => x.ImporteTotal, edicion.ImporteTotal)
+                .SetProperty(x => x.Estado, edicion.Estado)
+                .SetProperty(x => x.FormaPago, formaPago)
+                .SetProperty(x => x.UrlFotoTicket, edicionFotoUrl));
+
+            edicion = null;
+            await Cargar();
+        }
+        catch (Exception ex)
+        {
+            errorEdicion = ex.InnerException?.Message ?? ex.Message;
+        }
+        finally
+        {
+            guardandoEdicion = false;
+        }
+    }
+
     private async Task Borrar(long id)
     {
         idBorrando = null;
@@ -347,8 +482,8 @@ else
     }
 
     private record Fila(
-        long Id, DateTime? Fecha, string SocioNombre, decimal? ImporteTotal,
-        string Estado, string? FormaPago, bool? Revisado);
+        long Id, DateTime? Fecha, long? SocioId, string SocioNombre, decimal? ImporteTotal,
+        string Estado, string? FormaPago, bool? Revisado, string? UrlFotoTicket);
 
     private record Opcion(long Id, string Texto);
 }
