@@ -184,7 +184,7 @@ else
             var ruta = $"{Guid.NewGuid():N}{extension}";
 
             await using var stream = fichero.OpenReadStream(20 * 1024 * 1024);
-            edicion.Url = await Storage.SubirAsync("estatutos", ruta, stream,
+            edicion.Url = await Storage.SubirAsync("Estatutos", ruta, stream,
                 string.IsNullOrWhiteSpace(fichero.ContentType) ? "application/octet-stream" : fichero.ContentType);
         }
         catch (Exception ex)
@@ -260,7 +260,7 @@ else
 
     private async Task BorrarDeStorageSiPropio(string url)
     {
-        var marcador = "/object/public/estatutos/";
+        var marcador = "/object/public/Estatutos/";
         var indice = url.IndexOf(marcador, StringComparison.Ordinal);
         if (indice < 0)
         {
@@ -268,6 +268,6 @@ else
         }
 
         var ruta = url[(indice + marcador.Length)..];
-        await Storage.BorrarAsync("estatutos", ruta);
+        await Storage.BorrarAsync("Estatutos", ruta);
     }
 }
