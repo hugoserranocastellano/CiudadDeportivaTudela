@@ -157,7 +157,7 @@ else
                             @foreach (var ev in todosEventos)
                             {
                                 <tr>
-                                    <td>@ev.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td class="text-nowrap">@ev.Fecha.ToString("dd/MM/yyyy")</td>
                                     <td>@ev.Descripcion</td>
                                     <td>@(ev.Obligatorio == true ? "Obligatorio" : "Opcional")</td>
                                     <td>@(string.Equals(ev.Estado, "cerrado", StringComparison.OrdinalIgnoreCase) ? "Cerrado" : "Abierto")</td>

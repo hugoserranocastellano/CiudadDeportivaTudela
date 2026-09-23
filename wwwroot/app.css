@@ -118,6 +118,12 @@ h1:focus {
     color: #fff;
 }
 
+/* Los formularios de edición (EditForm con class="card") se confundían con
+   el fondo blanco de la página; un gris suave los distingue de un vistazo. */
+form.card {
+    background-color: #f4f5f6;
+}
+
 .tabla-marco {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: .5rem;

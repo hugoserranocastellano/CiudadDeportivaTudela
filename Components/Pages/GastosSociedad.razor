@@ -89,7 +89,7 @@ else
                 @foreach (var gasto in Ordenados)
                 {
                     <tr>
-                        <td>@gasto.Fecha.ToString("dd/MM/yyyy")</td>
+                        <td class="text-nowrap">@gasto.Fecha.ToString("dd/MM/yyyy")</td>
                         <td>@(gasto.Categoria ?? "—")</td>
                         <td>@gasto.TipoCategoria</td>
                         <td>@gasto.Descripcion</td>

@@ -53,7 +53,7 @@ else
                 {
                     <tr class="@(f.PagadaLimpieza != true ? "table-warning" : null)">
                         <td>@f.Id</td>
-                        <td>@f.Fecha.ToString("dd/MM/yyyy")</td>
+                        <td class="text-nowrap">@f.Fecha.ToString("dd/MM/yyyy")</td>
                         <td>
                             <div class="d-flex align-items-center gap-2">
                                 @if (!string.IsNullOrWhiteSpace(f.SocioFoto))
