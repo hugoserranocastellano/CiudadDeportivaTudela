@@ -80,3 +80,66 @@
     outline: 2px solid #198754;
     outline-offset: -2px;
 }
+
+/* Tarjetas de selección de mesa: foto más grande y texto más estrecho a su
+   derecha, con la mesa entera marcada en verde al elegirla en vez de un tick
+   nativo encima de la foto. */
+.mesa-card {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    max-width: 13rem;
+    padding: .5rem .75rem;
+    border: 2px solid var(--bs-border-color, #dee2e6);
+    border-radius: .6rem;
+    cursor: pointer;
+    background-color: #fff;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+
+.mesa-card:hover {
+    border-color: #adb5bd;
+}
+
+.mesa-card-seleccionada {
+    border-color: #198754;
+    background-color: #d1e7dd;
+}
+
+.mesa-card-foto {
+    position: relative;
+    flex: 0 0 auto;
+    width: 3.5rem;
+    height: 3.5rem;
+}
+
+.mesa-card-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: .5rem;
+}
+
+.mesa-card-check {
+    position: absolute;
+    top: -.4rem;
+    right: -.4rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background-color: #198754;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+}
+
+.mesa-card-texto {
+    font-size: .85rem;
+    line-height: 1.25;
+    max-width: 7rem;
+}
